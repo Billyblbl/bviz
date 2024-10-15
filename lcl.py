@@ -14,6 +14,15 @@ class Timespan:
 	def __str__(self):
 		return self.begin.strftime("%d/%m/%Y") + "-" + self.end.strftime("%d/%m/%Y")
 
+	def begin_str(self, fmt : str = "%d/%m/%Y"):
+		return self.begin.strftime(fmt)
+
+	def end_str(self, fmt : str = "%d/%m/%Y"):
+		return self.begin.strftime(fmt)
+
+	def span_str(self, fmt : str = "%d/%m/%Y", separator : str = "-"):
+		return self.begin.strftime(fmt) + separator + self.end.strftime(fmt)
+
 class Report:
 	def __init__(self, timespan : Timespan, movements : float, status : float, analysis : dict):
 		self.timespan = timespan
@@ -29,7 +38,7 @@ class Report:
 		} | self.analysis
 
 class Category:
-	def __init__(self, name, predicate, sub = []):
+	def __init__(self, name, predicate = lambda e: False, sub = []):
 		self.name = name
 		self.predicate = predicate
 		self.sub = sub
@@ -59,7 +68,7 @@ def analyse(parent_category : str, entries: list, categories : list = []) -> dic
 		unused_entries = [e for e in unused_entries if e not in sub_entries]
 
 	if len(unused_entries) != len(entries) and parent_category != "":
-		analysis[parent_category + ".other"] = sum(amount(e) for e in unused_entries)
+		analysis[parent_category + ".other"] = sum(amount(e) for e in unused_entries) if unused_entries else 0
 	return analysis
 
 class Import:
@@ -114,7 +123,7 @@ class Import:
 def report(section, categories : list) -> Report:
 	movements = [entry for entry in section if entry['account'] == '']
 	return Report(
-		timespan=str(Timespan(column(section, "date"))),
+		timespan=Timespan(column(section, "date")),
 		movements=sum(amount(r) for r in movements),
 		status=amount(next(entry for entry in section if entry['account'] != '')),
 		analysis=analyse("", movements, categories),

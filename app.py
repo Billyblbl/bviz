@@ -39,7 +39,6 @@ class App:
 		# font_loader()
 		# We need to call this function to load the fonts into a texture
 		imgui.backends.opengl3_new_frame()
-		imgui.get_io().display_size = (800, 600)
 		imgui.get_io().config_flags |= imgui.ConfigFlags_.docking_enable
 
 	def run_frame(self) -> bool:
