@@ -41,7 +41,7 @@ def column(data, field : str):
 def amount(entry) -> float:
 	return float(entry['amount'].replace(',', '.'))
 
-def from_specific(entry, person):
+def from_specific(entry : dict, person : str) -> bool:
 	return person in entry['label_in'] or person in entry['label_out']
 
 bank_statement_fields = ["date", "amount", "type", "account", "label_out", "label_in", "tbd", "note"]
@@ -50,7 +50,7 @@ def read_bank_statement(filename):
 		reader = csv.DictReader(file, fieldnames=bank_statement_fields, delimiter=';')
 		return [row for row in reader]
 
-def analyse(parent_category : str, entries, categories : list = []) -> dict :
+def analyse(parent_category : str, entries: list, categories : list = []) -> dict :
 	analysis = dict()
 	unused_entries = entries.copy()
 	for cat in categories:

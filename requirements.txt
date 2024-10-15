@@ -1,1 +1,3 @@
 matplotlib
+imgui-bundle
+glfw
