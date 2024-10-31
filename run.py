@@ -35,18 +35,31 @@ while app.run_frame():
 
 	imgui.dock_space_over_viewport()
 
+	with imgui_ctx.begin("Categories"):
+		def recursive_checkbox(category : Category) -> bool:
+			_, category.active = imgui.checkbox(category.name, category.active)
+			if category.active and category.sub:
+				imgui.same_line()
+				with imgui_ctx.tree_node("##" + category.name) as tree:
+					if (tree):
+						for sub in category.sub:
+							recursive_checkbox(sub)
+				return True
+			return False
+		for category in categories:
+			recursive_checkbox(category)
+
 	with imgui_ctx.begin("Plot window"):
 		implot.begin_plot("My Plot", imgui.get_content_region_avail())
 		implot.setup_axes("Time", "Movement EUR")
 		ticks = [r.timespan.span_str("%d/%m") for r in reports]
 		implot.setup_axis_ticks(implot.ImAxis_.x1, 0.0, len(ticks)-1, len(ticks), ticks, False)
-
 		def plot_categories(data : list[Report], categories: list[Category], group_size: float = 1, sub_cat_size : float = 0.5) -> None:
 			value_of = lambda report, category: report.analysis[category.name] if category.name in report.analysis else 0
 			values_of = lambda category: np.array([value_of(report, category) for report in data])
-			arr = np.ascontiguousarray([values_of(category) for category in categories])
+			arr = np.ascontiguousarray([values_of(category) for category in categories if category.active])
 			implot.plot_bar_groups(
-				label_ids=[c.name for c in categories],
+				label_ids=[c.name for c in categories if c.active],
 				values=arr,
 				group_count=len(data),
 				group_size=group_size,
@@ -54,9 +67,8 @@ while app.run_frame():
 				shift=group_size * sub_cat_size - 0.5 # offset to make the subcategory on the side of their parent,  -0.5 to center all
 			)
 			for category in categories:
-				if (category.sub):
-					plot_categories(data, category.sub + [Category(category.name + ".other")], group_size=group_size * 0.5, sub_cat_size=sub_cat_size)
-
+				if (category.active and category.sub):
+					plot_categories(data, category.sub, group_size=group_size * 0.5, sub_cat_size=sub_cat_size)
 		plot_categories(reports, categories)
 		implot.end_plot()
 

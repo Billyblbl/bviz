@@ -42,6 +42,9 @@ class Category:
 		self.name = name
 		self.predicate = predicate
 		self.sub = sub
+		if self.sub:
+			self.sub.append(Category(name + ".other"))
+		self.active = True
 
 def column(data, field : str):
 	return [row[field] for row in data]
@@ -67,8 +70,8 @@ def analyse(parent_category : str, entries: list, categories : list = []) -> dic
 		analysis |= { cat.name : sum(amount(e) for e in sub_entries) } | analyse(cat.name, sub_entries, cat.sub)
 		unused_entries = [e for e in unused_entries if e not in sub_entries]
 
-	if len(unused_entries) != len(entries) and parent_category != "":
-		analysis[parent_category + ".other"] = sum(amount(e) for e in unused_entries) if unused_entries else 0
+	if parent_category != "" and categories: #* last category is always "*.other" if has parent & not empty
+		analysis[categories[-1].name] = sum(amount(e) for e in unused_entries) if unused_entries else 0
 	return analysis
 
 class Import:
