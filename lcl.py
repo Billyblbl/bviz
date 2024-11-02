@@ -4,12 +4,38 @@ from enum import Enum
 import json
 from datetime import datetime
 import os
+from typing import Optional
+from dateutil.relativedelta import relativedelta
+
+class Granularity(Enum):
+	Day = 0
+	Month = 1
+	Year = 2
+
+	def __str__(self) -> str:
+		return ['day', 'month', 'year'][int(self)]
 
 class Timespan:
-	def __init__(self, dates):
+
+	@staticmethod
+	def from_dates(dates):
 		parsed = [datetime.strptime(d, "%d/%m/%Y") for d in dates]
-		self.begin = min(parsed)
-		self.end = max(parsed)
+		return Timespan(min(parsed), max(parsed))
+
+	@staticmethod
+	def from_date_granularity(date : datetime, granularity : Granularity, gran_count : int = 1):
+		match granularity:
+			case Granularity.Day:
+				return Timespan(b=date, e=date + relativedelta(days=gran_count-1))
+			case Granularity.Month:
+				e = date + relativedelta(months=gran_count-1)
+				return Timespan(b=date.replace(day=1), e=e.replace(day=calendar.monthrange(e.year, e.month)[1]))
+			case Granularity.Year:
+				return Timespan(b=date.replace(month=1, day=1), e=(date + relativedelta(years=gran_count-1)).replace(month=12, day=31))
+
+	def __init__(self, b, e):
+		self.begin = b
+		self.end = e
 
 	def __str__(self):
 		return self.begin.strftime("%d/%m/%Y") + "-" + self.end.strftime("%d/%m/%Y")
@@ -23,8 +49,25 @@ class Timespan:
 	def span_str(self, fmt : str = "%d/%m/%Y", separator : str = "-"):
 		return self.begin.strftime(fmt) + separator + self.end.strftime(fmt)
 
+	def sectionned(self, granularity : Granularity, count : int = 1) -> list:
+		it = Timespan(Timespan.from_date_granularity(self.begin, granularity, count).begin, Timespan.from_date_granularity(self.end, granularity, count).end)
+		sections = []
+		while it.begin < it.end:
+			match granularity:
+				case Granularity.Day:
+					sections.append(Timespan(b=it.begin, e=it.begin + relativedelta(days=count-1)))
+					it.begin = it.begin + relativedelta(days=count)
+				case Granularity.Month:
+					e = it.begin + relativedelta(months=count-1)
+					sections.append(Timespan(b=it.begin.replace(day=1), e=e.replace(day=calendar.monthrange(e.year, e.month)[1])))
+					it.begin = (it.begin + relativedelta(months=count)).replace(day=1)
+				case Granularity.Year:
+					sections.append(Timespan(b=it.begin.replace(month=1, day=1), e=(it.begin + relativedelta(years=count-1)).replace(month=12, day=31)))
+					it.begin = (it.begin + relativedelta(years=count)).replace(month=1, day=1)
+		return sections
+
 class Report:
-	def __init__(self, timespan : Timespan, movements : float, status : float, analysis : dict):
+	def __init__(self, timespan : Timespan, movements : float, status : Optional[float], analysis : dict):
 		self.timespan = timespan
 		self.movements = movements
 		self.status = status
@@ -95,39 +138,32 @@ class Import:
 	def section(self, timespan : Timespan):
 		return filter(lambda e: e['date'] >= timespan.begin and e['date'] <= timespan.end, self.entries())
 
-	class Granularity(Enum):
-		Day = "day"
-		Month = "month"
-		Year = "year"
+	class Section:
+		def __init__(self, timespan : Timespan, entries = []):
+			self.timespan = timespan
+			self.entries = entries
 
-	def sectionned(self, granularity : Granularity, count : int = 1):
-		class Section:
-			def __init__(self, begin : datetime, end : datetime, entries = []):
-				self.begin = begin
-				self.end = end
-				self.entries = entries
-		sections = []
+	def make_report(section : Section, categories : list) -> Report:
+		movements = [entry for entry in section.entries if entry['account'] == '']
+		return Report(
+			timespan=section.timespan,
+			movements=sum(amount(r) for r in movements),
+			status=next(iter(amount(entry) for entry in section.entries if entry['account'] != ''), None),#* only sometimes present in a section
+			analysis=analyse("", movements, categories),
+		)
+
+	def sectionned(self, granularity : Granularity, count : int = 1) -> list[Section]:
+		#* Create sections (thats a whole lot of discarded parsing, easy perf gain here @OPTI)
+		total_timespan = Timespan(
+			min(datetime.strptime(e['date'], "%d/%m/%Y") for e in self.entries).replace(hour=0, minute=0, second=0),
+			max(datetime.strptime(e['date'], "%d/%m/%Y") for e in self.entries).replace(hour=23, minute=59, second=59)
+		)
+		sections = [Import.Section(t, []) for t in total_timespan.sectionned(granularity, count)]
+		#* Distribute entries in sections
 		for e in self.entries:
 			date = datetime.strptime(e['date'], "%d/%m/%Y")
-			section = next((s for s in sections if date >= s.begin and date <= s.end), None)
-			if not section:
-				match granularity:
-					case Import.Granularity.Day:
-						section = Section(begin = date, end = date.replace(day=date.day+count-1), entries = [e])
-					case Import.Granularity.Month:
-						section = Section(begin = date.replace(day=1), end = date.replace(day=calendar.monthrange(date.year, date.month+count-1)[1]), entries = [e])
-					case Import.Granularity.Year:
-						section = Section(begin = date.replace(month=1, day=1), end = date.replace(year=date.year+count-1, month=12, day=31), entries = [e])
-				sections.append(section)
-			else:
-				section.entries.append(e)
-		return iter(s.entries for s in sorted(sections, key=lambda s: s.begin))
+			next((s for s in sections if date >= s.timespan.begin and date <= s.timespan.end)).entries.append(e)
+		return sections
 
-def report(section, categories : list) -> Report:
-	movements = [entry for entry in section if entry['account'] == '']
-	return Report(
-		timespan=Timespan(column(section, "date")),
-		movements=sum(amount(r) for r in movements),
-		status=amount(next(entry for entry in section if entry['account'] != '')),
-		analysis=analyse("", movements, categories),
-	)
+	def analyse(self, categories : list[Category], granularity : Granularity, count : int = 1):
+		return [Import.make_report(s, categories) for s in self.sectionned(granularity, count)]
