@@ -1,10 +1,7 @@
-import csv
-
 from imgui_bundle import portable_file_dialogs as pfd #type: ignore
 from imgui_bundle import imgui, imgui_ctx, implot
 from analysis import AnalysisUI
 from app import App
-import numpy as np
 
 from lcl import Category, Import, amount, from_specific
 

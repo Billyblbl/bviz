@@ -1,0 +1,31 @@
+- [x] basic imgui app
+- [x] imports
+- [x] category analysis
+- [x] plotting
+- [x] analysis dumping
+- [x] granularity controls
+- [ ] Import config edits
+	- [ ] New
+	- [ ] Add files
+	- [ ] Remove files
+	- [ ] Reload
+	- [ ] Save
+	- [ ] Import date range filtering
+- [ ] Categories edits
+	- [ ] New
+	- [ ] Add Category
+		- [ ] Subcategories
+	- [ ] Remove Category
+	- [ ] filters
+		- [ ] regex on column
+		- [ ] amount comparison
+			- [ ] ==
+			- [ ] >
+			- [ ] <
+			- [ ] >=
+			- [ ] <=
+			- [ ] !=
+- [ ] Pinned autoimport
+- [ ] drag n drop loading
+- [ ] dashboard
+- [ ] logging console
