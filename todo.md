@@ -4,14 +4,17 @@
 - [x] plotting
 - [x] analysis dumping
 - [x] granularity controls
-- [ ] Import config edits
-	- [ ] New
-	- [ ] Add files
-	- [ ] Remove files
-	- [ ] Reload
-	- [ ] Save
-	- [ ] Import date range filtering
+- [x] Import config edits
+	- [x] New
+	- [x] Add files
+	- [x] Remove files
+	- [x] Reload
+	- [x] Save
+	- [x] Import date range filtering
+	- [ ] extract to module
 - [ ] Categories edits
+	- [ ] Load
+	- [ ] Save
 	- [ ] New
 	- [ ] Add Category
 		- [ ] Subcategories

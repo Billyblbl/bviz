@@ -3,7 +3,7 @@ import csv
 from enum import Enum
 import json
 from datetime import datetime
-import os
+from os import path
 from typing import Optional
 from dateutil.relativedelta import relativedelta
 
@@ -18,8 +18,8 @@ class Granularity(Enum):
 class Timespan:
 
 	@staticmethod
-	def from_dates(dates):
-		parsed = [datetime.strptime(d, "%d/%m/%Y") for d in dates]
+	def from_dates(dates, fmt : str = "%d/%m/%Y"):
+		parsed = [datetime.strptime(d, fmt) for d in dates]
 		return Timespan(min(parsed), max(parsed))
 
 	@staticmethod
@@ -118,25 +118,78 @@ def analyse(parent_category : str, entries: list, categories : list = []) -> dic
 	return analysis
 
 class Import:
-	def __init__(self, filename):
-		self.filename = os.path.abspath(filename)
-		with open(self.filename) as inp:
-			data = json.load(inp)
-			self.begin = data['begin']
-			self.end = data['end']
-			self.complete = 'incomplete' not in data.keys()
-			if not self.complete:
-				self.incomplete_month_start = data['incomplete']
-			self.files = [os.path.dirname(self.filename) + '/' + f for f in data['files']]
-			self.entries = self.read_entries()
 
-	def read_entries(self):
+	def __init__(self, filename : str = None):
+		self.filename : str = filename if filename else "unsaved.json"
+		self.begin : datetime = None
+		self.end : datetime = None
+		self.files: list[str] = []
+		self.entries : list[dict] = []
+		self.version_id = 0
+		if filename:
+			self.load(filename)
+
+	@staticmethod
+	def from_file(filename, datetime_fmt = "%Y/%m/%d") -> "Import":
+		new = Import()
+		new.load(filename, datetime_fmt=datetime_fmt)
+		return new
+
+	def to_json(self, datetime_fmt = "%d/%m/%Y"):
+		if self.begin is None or self.end is None:
+			raise Exception("Timespan not set")
+		return {
+			'begin' : self.begin.strftime(datetime_fmt),
+			'end' : self.end.strftime(datetime_fmt),
+			'files' : [path.relpath(f, path.dirname(self.filename)) for f in self.files],
+		}
+
+	def valid(self) -> bool:
+		return self.begin is not None and self.end is not None
+
+	def save(self, filename = None, datetime_fmt = "%Y/%m/%d"):
+		try:
+			if filename:
+				self.filename = filename
+			with open(self.filename, 'w') as out:
+				json.dump(self.to_json(datetime_fmt=datetime_fmt), out)
+		except Exception as e:
+			print(e)
+
+	def load(self, filename = None, datetime_fmt = "%Y/%m/%d"):
+		try:
+			if filename:
+				self.filename = filename
+			with open(self.filename) as inp:
+				if inp is None:
+					raise Exception("File not found")
+				data = json.load(inp)
+				self.begin = datetime.strptime(data['begin'], datetime_fmt)
+				self.end = datetime.strptime(data['end'], datetime_fmt)
+				self.files = [path.dirname(self.filename) + '/' + f for f in data['files']]
+				self.load_entries()
+		except Exception as e:
+			print(e)
+
+	def read_entries(self, apply_filter = True):
 		entries = []
 		[entries := entries + read_bank_statement(f) for f in self.files]
+		if apply_filter and self.valid():
+			entries = [e for e in entries if datetime.strptime(e['date'], "%d/%m/%Y") >= self.begin and datetime.strptime(e['date'], "%d/%m/%Y") <= self.end]
 		return entries
+
+	def load_entries(self):
+		print("loading entries")
+		self.entries = self.read_entries()
+		self.version_id += 1
 
 	def section(self, timespan : Timespan):
 		return filter(lambda e: e['date'] >= timespan.begin and e['date'] <= timespan.end, self.entries())
+
+	def select_dates_from_contents(self):
+		entries = self.read_entries(apply_filter=False)
+		self.begin = min(datetime.strptime(e['date'], "%d/%m/%Y") for e in entries)
+		self.end = max(datetime.strptime(e['date'], "%d/%m/%Y") for e in entries)
 
 	class Section:
 		def __init__(self, timespan : Timespan, entries = []):
@@ -154,6 +207,8 @@ class Import:
 
 	def sectionned(self, granularity : Granularity, count : int = 1) -> list[Section]:
 		#* Create sections (thats a whole lot of discarded parsing, easy perf gain here @OPTI)
+		if self.entries is None or len(self.entries) == 0:
+			return []
 		total_timespan = Timespan(
 			min(datetime.strptime(e['date'], "%d/%m/%Y") for e in self.entries).replace(hour=0, minute=0, second=0),
 			max(datetime.strptime(e['date'], "%d/%m/%Y") for e in self.entries).replace(hour=23, minute=59, second=59)

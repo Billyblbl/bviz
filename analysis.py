@@ -48,7 +48,7 @@ def input_granularity(title: str, granularity : tuple[Granularity, int]) -> tupl
 				imgui.table_next_column()
 				changed_count, gran_count = imgui.input_int("Count", gran_count)
 				changed = changed_type or changed_count
-	return changed, gran_type, gran_count
+	return changed, gran_type, max(1, gran_count)
 
 class AnalysisUI:
 
@@ -59,6 +59,13 @@ class AnalysisUI:
 		self.reports : list[Report] = None
 		self.dump_save_dialog = None
 		self.last_used : Import = None
+		self.last_used_id : int = 0
+
+	def use(self, imp : Import) -> bool:
+		is_new = imp and (imp != self.last_used or self.last_used_id != imp.version_id)
+		self.last_used = imp
+		self.last_used_id = imp.version_id if imp else 0
+		return is_new
 
 	def draw(self, imp : Import) -> None:
 		with imgui_ctx.begin("Categories"):
@@ -76,12 +83,11 @@ class AnalysisUI:
 				recursive_checkbox(category)
 		with imgui_ctx.begin("Analysis"):
 			changed, self.granularity_type, self.granularity_count = input_granularity("Granularity", (self.granularity_type, self.granularity_count))
-			if (changed and imp) or (not self.reports and imp) or (self.last_used and imp and self.last_used != imp):
+			if (changed and imp) or (not self.reports and imp) or self.use(imp):
 				try:
 					self.reports = imp.analyse(self.categories, self.granularity_type, self.granularity_count)
 				except Exception as e:
 					print("error", e)
-			self.last_used = imp
 			if imp and imgui.button("Dump"):
 				self.dump_save_dialog = pfd.save_file("Save to", imp.filename + "-" + self.granularity_type.name + str(self.granularity_count) + "-analysis.csv", filters=["*.csv"])
 			if self.dump_save_dialog and self.dump_save_dialog.ready():
