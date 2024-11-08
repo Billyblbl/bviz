@@ -11,7 +11,7 @@
 	- [x] Reload
 	- [x] Save
 	- [x] Import date range filtering
-	- [ ] extract to module
+	- [x] extract to module
 - [ ] Categories edits
 	- [ ] Load
 	- [ ] Save
