@@ -2,18 +2,15 @@ from app import App
 from imgui_bundle import imgui, imgui_ctx, implot
 import imports
 import analysis
-from imports import amount, from_specific
-from analysis import Category
+import category
 
 app = App()
-
-categories = [
-]
 
 implot.create_context()
 
 import_ui = imports.UI()
-analysis_ui = analysis.UI(categories)
+category_ui = category.UI()
+analysis_ui = analysis.UI()
 
 while app.run_frame():
 
@@ -31,8 +28,13 @@ while app.run_frame():
 
 	imgui.dock_space_over_viewport()
 
-	import_ui.draw()
-	analysis_ui.draw(import_ui.selected_import)
+	changed_selected_import, selected_import = import_ui.draw("Imports")
+	changed_categories, selected_categories = category_ui.draw("Categories")
+	analysis_ui.draw("Analysis",
+		imp=selected_import,
+		categories=selected_categories,
+		dirty=changed_selected_import or changed_categories
+	)
 
 	app.render()
 

@@ -1,30 +1,12 @@
 import csv
+from enum import Enum
 from typing import Optional
 from imgui_bundle import portable_file_dialogs as pfd #type: ignore
 from imgui_bundle import imgui, implot, ImVec2, imgui_ctx
 import numpy as np
+from category import Category, categorise
 from imports import Import, amount
 from schedule import Timespan, Granularity
-
-class Category:
-	def __init__(self, name, predicate = lambda _: False, sub = []):
-		self.name = name
-		self.predicate = predicate
-		self.sub = sub
-		if self.sub:
-			self.sub.append(Category(name + ".other"))
-		self.active = True
-
-def categorise(parent_category : str, entries: list[dict], categories : list[Category] = []) -> dict:
-	analysis = dict()
-	unused_entries = entries.copy()
-	for cat in categories:
-		sub_entries = [e for e in entries if cat.predicate(e)]
-		analysis |= { cat.name : sum(amount(e) for e in sub_entries) } | categorise(cat.name, sub_entries, cat.sub)
-		unused_entries = [e for e in unused_entries if e not in sub_entries]
-	if parent_category != "" and categories: #* last category is always "*.other" if has parent & not empty
-		analysis[categories[-1].name] = sum(amount(e) for e in unused_entries) if unused_entries else 0
-	return analysis
 
 class Report:
 	def __init__(self, timespan : Timespan, movements : float, status : Optional[float], categorised : dict):
@@ -99,56 +81,54 @@ def input_granularity(title: str, granularity : tuple[Granularity, int]) -> tupl
 				changed = changed_type or changed_count
 	return changed, gran_type, max(1, gran_count)
 
+
 #region UI
+
 class UI:
 
-	def __init__(self, categories : list[Category]):
-		self.categories = categories
+	def __init__(self):
 		self.granularity_type : Granularity = Granularity.Month
 		self.granularity_count : int = 1
 		self.analysis : list[Report] = None
-		self.dump_save_dialog = None
-		self.last_used : Import = None
-		self.last_used_id : int = 0
+		self.dump_save_dialog : pfd.save_file = None
 
-	def use(self, imp : Import) -> bool:
-		is_new = imp and (imp != self.last_used or self.last_used_id != imp.version_id)
-		self.last_used = imp
-		self.last_used_id = imp.version_id if imp else 0
-		return is_new
-
-	def draw(self, imp : Import) -> None:
-		with imgui_ctx.begin("Categories"):
-			def recursive_checkbox(category : Category) -> bool:
-				_, category.active = imgui.checkbox(category.name, category.active)
-				if category.active and category.sub:
-					imgui.same_line()
-					with imgui_ctx.tree_node("##" + category.name) as tree:
-						if (tree):
-							for sub in category.sub:
-								recursive_checkbox(sub)
-					return True
-				return False
-			for category in self.categories:
-				recursive_checkbox(category)
-		with imgui_ctx.begin("Analysis"):
-			changed, self.granularity_type, self.granularity_count = input_granularity("Granularity", (self.granularity_type, self.granularity_count))
-			if (changed and imp) or (not self.analysis and imp) or self.use(imp):
-				try:
-					self.analysis = analyse(imp, self.categories, self.granularity_type, self.granularity_count)
-				except Exception as e:
-					print("error", e)
-			if imp and imgui.button("Dump"):
-				self.dump_save_dialog = pfd.save_file("Save to", imp.filename + "-" + self.granularity_type.name + str(self.granularity_count) + "-analysis.csv", filters=["*.csv"])
-			if self.dump_save_dialog and self.dump_save_dialog.ready():
-				filepath = self.dump_save_dialog.result()
-				if (filepath):
-					dump_reports(self.analysis, filepath)
-				self.dump_save_dialog = None
-			if self.analysis:
-				plot_analysis(
-					categories=self.categories,
-					analysis=self.analysis,
-					size=imgui.get_content_region_avail()
-				)
+	def draw(self, title : str, imp : Import, categories : list[Category], dirty : bool = False) -> None:
+		with imgui_ctx.begin(title) as window:
+			if window:
+				with imgui_ctx.begin_table("##analysis table", 2, flags=imgui.TableFlags_.resizable):
+					imgui.table_next_column()
+					def recursive_checkbox(category : Category) -> bool:
+						_, category.active = imgui.checkbox(category.name, category.active)
+						if category.active and category.sub:
+							imgui.same_line()
+							with imgui_ctx.tree_node("##" + category.name) as tree:
+								if (tree):
+									for sub in category.sub:
+										recursive_checkbox(sub)
+							return True
+						return False
+					for category in categories:
+						recursive_checkbox(category)
+					imgui.table_next_column()
+					changed_gran, self.granularity_type, self.granularity_count = input_granularity("Granularity", (self.granularity_type, self.granularity_count))
+					if dirty:
+						self.analysis = None
+					if imp and (changed_gran or (not self.analysis)):
+						try:
+							self.analysis = analyse(imp, categories, self.granularity_type, self.granularity_count)
+						except Exception as e:
+							print("error", e)
+					if imp and imgui.button("Dump"):
+						self.dump_save_dialog = pfd.save_file("Save to", imp.filename + "-" + self.granularity_type.name + str(self.granularity_count) + "-analysis.csv", filters=["*.csv"])
+					if self.dump_save_dialog and self.dump_save_dialog.ready():
+						filepath = self.dump_save_dialog.result()
+						if (filepath):
+							dump_reports(self.analysis, filepath)
+						self.dump_save_dialog = None
+					if self.analysis:
+						plot_analysis(
+							categories=categories,
+							analysis=self.analysis,
+							size=imgui.get_content_region_avail()
+						)
 #endregion UI

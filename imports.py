@@ -22,7 +22,6 @@ class Import:
 		self.end : datetime = None
 		self.files: list[str] = []
 		self.entries : list[dict] = []
-		self.version_id = 0
 		if filename:
 			self.load(filename)
 
@@ -78,7 +77,6 @@ class Import:
 	def load_entries(self):
 		print("loading entries")
 		self.entries = self.read_entries()
-		self.version_id += 1
 
 	def section(self, timespan : Timespan):
 		return filter(lambda e: e['date'] >= timespan.begin and e['date'] <= timespan.end, self.entries())
@@ -187,6 +185,7 @@ class UI:
 			pressed = True
 			if self.selected_import == imp:
 				self.selected_import = None
+				changed_selected = True
 			self.imported.remove(imp)
 		if not imp:
 			imgui.end_disabled()
@@ -195,120 +194,129 @@ class UI:
 	def file_op_ready(self, operation) -> bool:
 		return self.file_dialog[0] == operation and self.file_dialog[1].ready()
 
-	def draw(self) -> None:
-		with imgui_ctx.begin("Imports"):
-
-			with imgui_ctx.begin_table("##imports table", 3, flags=imgui.TableFlags_.resizable):
-				#region imports list column
-				imgui.table_next_column()
-				if imgui.button("New"):
-					self.imported.append(Import())
-					self.selected_import = self.imported[-1]
-				imgui.same_line()
-				self.save_button(self.selected_import)
-				if self.file_op_ready(UI.FileOperation.SAVE_IMPORTS):
-					filepath = self.file_dialog[1].result()
-					if filepath:
-						print(filepath)
-						self.selected_import.save(filename=filepath)
-					self.file_dialog = UI.FileOperation.make_noop()
-					self.file_op_target = None
-				imgui.same_line()
-				self.load_button()
-				if self.file_op_ready(UI.FileOperation.LOAD_IMPORTS):
-					for filepath in self.file_dialog[1].result():
-						print(filepath)
-						self.imported.append(Import.from_file(filepath))
-					self.selected_import = self.imported[-1]
-					self.file_dialog = UI.FileOperation.make_noop()
-				imgui.same_line()
-				self.reload_button(self.selected_import)
-				imgui.same_line()
-				self.remove_button(self.selected_import)
-
-				with imgui_ctx.begin_list_box("##imports", imgui.get_content_region_avail()):
-					with imgui_ctx.begin_table('##import entry', 2, flags=imgui.TableFlags_.resizable):
-						for import_data in self.imported:
-							with imgui_ctx.push_id(import_data.filename):
-								imgui.table_next_row()
-								imgui.table_next_column()
-								_, selected = imgui.selectable(path.basename(import_data.filename), self.selected_import.filename == import_data.filename if self.selected_import else False, imgui.SelectableFlags_.allow_double_click)
-								if selected:
-									self.selected_import = import_data
-								imgui.table_next_column()
-								self.save_button(import_data)
-								imgui.same_line()
-								self.reload_button(import_data)
-								imgui.same_line()
-								self.remove_button(import_data)
-					if imgui.button("+"):
+	def draw(self, title : str = "Imports") -> tuple[bool, Import]:
+		changed_selected = False
+		with imgui_ctx.begin(title) as window:
+			if window:
+				with imgui_ctx.begin_table("##imports table", 3, flags=imgui.TableFlags_.resizable):
+					#region imports list column
+					imgui.table_next_column()
+					if imgui.button("New"):
 						self.imported.append(Import())
 						self.selected_import = self.imported[-1]
+						changed_selected = True
 					imgui.same_line()
-					if imgui.button("Load"):
-						self.file_dialog = (UI.FileOperation.LOAD_IMPORTS, pfd.open_file("Select report file", filters=["*.json"], options=pfd.opt.multiselect))
-				#endregion imports list column
-
-				#region import config column
-				imgui.table_next_column()
-				if (self.selected_import):
-
-					if len(self.selected_import.files) == 0:
-						imgui.begin_disabled()
-					if imgui.button("Select dates from contents"):
-						self.selected_import.select_dates_from_contents()
-					if len(self.selected_import.files) == 0:
-						imgui.end_disabled()
+					self.save_button(self.selected_import)
+					if self.file_op_ready(UI.FileOperation.SAVE_IMPORTS):
+						filepath = self.file_dialog[1].result()
+						if filepath:
+							print(filepath)
+							self.selected_import.save(filename=filepath)
+							changed_selected = True
+						self.file_dialog = UI.FileOperation.make_noop()
+						self.file_op_target = None
 					imgui.same_line()
-					_, self.auto_select_import_dates = imgui.checkbox("Auto", self.auto_select_import_dates)
+					self.load_button()
+					if self.file_op_ready(UI.FileOperation.LOAD_IMPORTS):
+						for filepath in self.file_dialog[1].result():
+							print(filepath)
+							self.imported.append(Import.from_file(filepath))
+						self.selected_import = self.imported[-1]
+						changed_selected = True
+						self.file_dialog = UI.FileOperation.make_noop()
+					imgui.same_line()
+					self.reload_button(self.selected_import)
+					imgui.same_line()
+					self.remove_button(self.selected_import)
 
-					if self.auto_select_import_dates and len(self.selected_import.files) > 0:
-						self.selected_import.select_dates_from_contents()
-						imgui.begin_disabled()
-					changed, self.selected_import.begin = input_date("Begin", self.selected_import.begin)
-					changed, self.selected_import.end = input_date("End", self.selected_import.end)
-					if changed and self.selected_import.valid():
-						self.selected_import.load_entries()
-					if self.auto_select_import_dates and len(self.selected_import.files) > 0:
-						imgui.end_disabled()
-
-				with imgui_ctx.begin_list_box("##imports files box", imgui.get_content_region_avail()):
-					if self.selected_import:
-						with imgui_ctx.begin_table("##import files entry table", 2, flags=imgui.TableFlags_.resizable):
-							for file in self.selected_import.files:
-								with imgui_ctx.push_id(file):
+					with imgui_ctx.begin_list_box("##imports", imgui.get_content_region_avail()):
+						with imgui_ctx.begin_table('##import entry', 2, flags=imgui.TableFlags_.resizable):
+							for import_data in self.imported:
+								with imgui_ctx.push_id(import_data.filename):
 									imgui.table_next_row()
 									imgui.table_next_column()
-									_, selected = imgui.selectable(path.basename(file), self.selected_source_file == file, imgui.SelectableFlags_.allow_double_click)
+									_, selected = imgui.selectable(path.basename(import_data.filename), self.selected_import.filename == import_data.filename if self.selected_import else False, imgui.SelectableFlags_.allow_double_click)
 									if selected:
-										self.selected_source_file = file
+										self.selected_import = import_data
+										changed_selected = True
 									imgui.table_next_column()
-									if imgui.button("X"):
-										self.selected_import.files.remove(file)
-										self.selected_import.load_entries()
-										self.selected_source_file = None
-						if (imgui.button("+")):
-							self.try_select_sources()
-						if self.file_op_ready(UI.FileOperation.SECLECT_SOURCES):
-							for filepath in self.file_dialog[1].result():
-								self.selected_import.files.append(filepath)
-							self.selected_import.load_entries()
-							self.file_dialog = UI.FileOperation.make_noop()
-				#endregion import config column
+									self.save_button(import_data)
+									imgui.same_line()
+									self.reload_button(import_data)
+									imgui.same_line()
+									self.remove_button(import_data)
+						if imgui.button("+"):
+							self.imported.append(Import())
+							self.selected_import = self.imported[-1]
+							changed_selected = True
+						imgui.same_line()
+						if imgui.button("Load"):
+							self.file_dialog = (UI.FileOperation.LOAD_IMPORTS, pfd.open_file("Select report file", filters=["*.json"], options=pfd.opt.multiselect))
+					#endregion imports list column
 
-				#region import contents column
-				imgui.table_next_column()
-				with imgui_ctx.begin_list_box("##imports contents box", imgui.get_content_region_avail()):
-					if self.selected_import and self.selected_import.entries:
-						columns = self.selected_import.entries[0].keys()
-						with imgui_ctx.begin_table("##import contents table", len(columns), flags=imgui.TableFlags_.resizable):
-							for c in columns:
-								imgui.table_setup_column(c)
-							imgui.table_headers_row()
-							for entry in self.selected_import.entries:
-								imgui.table_next_row()
+					#region import config column
+					imgui.table_next_column()
+					if (self.selected_import):
+						if len(self.selected_import.files) == 0:
+							imgui.begin_disabled()
+						if imgui.button("Select dates from contents"):
+							self.selected_import.select_dates_from_contents()
+						if len(self.selected_import.files) == 0:
+							imgui.end_disabled()
+						imgui.same_line()
+						_, self.auto_select_import_dates = imgui.checkbox("Auto", self.auto_select_import_dates)
+
+						if self.auto_select_import_dates and len(self.selected_import.files) > 0:
+							self.selected_import.select_dates_from_contents()
+							imgui.begin_disabled()
+						changed, self.selected_import.begin = input_date("Begin", self.selected_import.begin)
+						changed, self.selected_import.end = input_date("End", self.selected_import.end)
+						if changed and self.selected_import.valid():
+							self.selected_import.load_entries()
+							changed_selected = True
+						if self.auto_select_import_dates and len(self.selected_import.files) > 0:
+							imgui.end_disabled()
+
+					with imgui_ctx.begin_list_box("##imports files box", imgui.get_content_region_avail()):
+						if self.selected_import:
+							with imgui_ctx.begin_table("##import files entry table", 2, flags=imgui.TableFlags_.resizable):
+								for file in self.selected_import.files:
+									with imgui_ctx.push_id(file):
+										imgui.table_next_row()
+										imgui.table_next_column()
+										_, selected = imgui.selectable(path.basename(file), self.selected_source_file == file, imgui.SelectableFlags_.allow_double_click)
+										if selected:
+											self.selected_source_file = file
+										imgui.table_next_column()
+										if imgui.button("X"):
+											self.selected_import.files.remove(file)
+											self.selected_import.load_entries()
+											changed_selected = True
+											self.selected_source_file = None
+							if (imgui.button("+")):
+								self.try_select_sources()
+							if self.file_op_ready(UI.FileOperation.SECLECT_SOURCES):
+								for filepath in self.file_dialog[1].result():
+									self.selected_import.files.append(filepath)
+								self.selected_import.load_entries()
+								changed_selected = True
+								self.file_dialog = UI.FileOperation.make_noop()
+					#endregion import config column
+
+					#region import contents column
+					imgui.table_next_column()
+					with imgui_ctx.begin_list_box("##imports contents box", imgui.get_content_region_avail()):
+						if self.selected_import and self.selected_import.entries:
+							columns = self.selected_import.entries[0].keys()
+							with imgui_ctx.begin_table("##import contents table", len(columns), flags=imgui.TableFlags_.resizable):
 								for c in columns:
-									imgui.table_next_column()
-									imgui.text(entry[c])
+									imgui.table_setup_column(c)
+								imgui.table_headers_row()
+								for entry in self.selected_import.entries:
+									imgui.table_next_row()
+									for c in columns:
+										imgui.table_next_column()
+										imgui.text(entry[c])
+		return changed_selected, self.selected_import
 				#endregion import contents column
 # endregion ui

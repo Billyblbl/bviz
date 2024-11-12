@@ -12,19 +12,19 @@
 	- [x] Save
 	- [x] Import date range filtering
 	- [x] extract to module
-- [ ] Categories edits
-	- [ ] Load
-	- [ ] Save
-	- [ ] New
-	- [ ] Add Category
-		- [ ] Subcategories
-	- [ ] Remove Category
-	- [ ] filters
-		- [ ] regex on column
+- [-] Categories edits
+	- [x] Load
+	- [x] Save
+	- [x] New
+	- [x] Add Category
+		- [x] Subcategories
+	- [x] Remove Category
+	- [x] filters
+		- [x] regex on column
 		- [ ] amount comparison
 			- [ ] ==
-			- [ ] >
-			- [ ] <
+			- [x] >
+			- [x] <
 			- [ ] >=
 			- [ ] <=
 			- [ ] !=
