@@ -31,15 +31,14 @@ class CategoryBlueprint:
 
 	class Filter(Enum):
 		Regex = 0
-		LessThan = 1
-		MoreThan = 2
-		MovementTarget = 3
-		Custom = 4
+		Comparison = 1
+		MovementTarget = 2
+		Custom = 3
 		# TODO: implement
-		# QuerySQL = 5
-		# Multiple = 6
+		# QuerySQL = 4
+		# Multiple = 5
 
-	FilterConfig = str | tuple[str, str] | float | None
+	FilterConfig = str | tuple[str, str] | tuple[str, float] | None
 
 	def __init__(self, name : str = "unnamed", filter_ : Filter = Filter.Regex, config : FilterConfig = ("", ""), sub : list = []) -> None:
 		self.name : str = copy(name)
@@ -69,10 +68,20 @@ def build_category_tree(blueprint : CategoryBlueprint) -> Category:
 	match blueprint.filter:
 		case CategoryBlueprint.Filter.Regex:
 			predicate = lambda e: re.search(blueprint.config[0], e[blueprint.config[1]]) != None # config is tuple[str, str]
-		case CategoryBlueprint.Filter.LessThan:
-			predicate = lambda e: amount(e) < blueprint.config # config is numerical
-		case CategoryBlueprint.Filter.MoreThan:
-			predicate = lambda e: amount(e) > blueprint.config # config is numerical
+		case CategoryBlueprint.Filter.Comparison:
+			match blueprint.config[0]:
+				case "==":
+					predicate = lambda e: amount(e) == blueprint.config[1] # config is numerical
+				case "!=":
+					predicate = lambda e: amount(e) != blueprint.config[1] # config is numerical
+				case ">=":
+					predicate = lambda e: amount(e) >= blueprint.config[1] # config is numerical
+				case "<=":
+					predicate = lambda e: amount(e) <= blueprint.config[1] # config is numerical
+				case ">":
+					predicate = lambda e: amount(e) > blueprint.config[1] # config is numerical
+				case "<":
+					predicate = lambda e: amount(e) < blueprint.config[1] # config is numerical
 		case CategoryBlueprint.Filter.MovementTarget:
 			predicate = lambda e: re.search(blueprint.config, e["label_in"]) != None or re.search(blueprint.config, e["label_out"]) != None # config is str
 		case CategoryBlueprint.Filter.Custom:
@@ -130,6 +139,7 @@ class UI:
 												raise Exception("File not found")
 											for d in json.load(source):
 												self.file_op_target.append(CategoryBlueprint.from_dict(d))
+												self.selection_blueprints = self.file_op_target[-1]
 									except Exception as e:
 										print("failed to load {} : {}".format(filepath, e))
 								self.file_op = None
@@ -185,6 +195,7 @@ class UI:
 
 											if imgui.button("+"):
 												blueprint.sub.append(CategoryBlueprint())
+												self.selection_blueprints = blueprint.sub[-1]
 											imgui.same_line()
 											if imgui.button("Load"):
 												self.load_category(blueprint.sub)
@@ -198,6 +209,8 @@ class UI:
 											imgui.same_line()
 											if imgui.button("X"):
 												blueprints.remove(blueprint)
+												if self.selection_blueprints == blueprint:
+													self.selection_blueprints = None
 											imgui.indent()
 											changed_rec |= recursive_blueprints_edit(blueprint.sub)
 											imgui.unindent()
@@ -207,6 +220,7 @@ class UI:
 								imgui.table_next_column()
 								if imgui.button("+"):
 									self.blueprints.append(CategoryBlueprint())
+									self.selection_blueprints = self.blueprints[-1]
 								imgui.same_line()
 								if imgui.button("Load"):
 									self.load_category(self.blueprints)
@@ -224,10 +238,13 @@ class UI:
 									_, reg = imgui.input_text("Regex", self.selection_blueprints.config[0])
 									_, col = imgui.input_text("Column", self.selection_blueprints.config[1])
 									self.selection_blueprints.config = (reg, col)
-								case CategoryBlueprint.Filter.LessThan | CategoryBlueprint.Filter.MoreThan:
+								case CategoryBlueprint.Filter.Comparison:
 									if changed_filter:
-										self.selection_blueprints.config = 0
-									_, self.selection_blueprints.config = imgui.input_float("Threshold", self.selection_blueprints.config)
+										self.selection_blueprints.config = ("==", 0)
+									comparators = ["==", "!=", ">", "<", ">=", "<="]
+									_, comp_idx = imgui.combo("Comparison", comparators.index(self.selection_blueprints.config[0]), comparators)
+									_, comp_operand = imgui.input_float("Operand", self.selection_blueprints.config[1])
+									self.selection_blueprints.config = (comparators[comp_idx], comp_operand)
 								case CategoryBlueprint.Filter.MovementTarget:
 									if changed_filter:
 										self.selection_blueprints.config = ""

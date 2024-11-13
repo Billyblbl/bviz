@@ -97,19 +97,6 @@ class UI:
 			if window:
 				with imgui_ctx.begin_table("##analysis table", 2, flags=imgui.TableFlags_.resizable):
 					imgui.table_next_column()
-					def recursive_checkbox(category : Category) -> bool:
-						_, category.active = imgui.checkbox(category.name, category.active)
-						if category.active and category.sub:
-							imgui.same_line()
-							with imgui_ctx.tree_node("##" + category.name) as tree:
-								if (tree):
-									for sub in category.sub:
-										recursive_checkbox(sub)
-							return True
-						return False
-					for category in categories:
-						recursive_checkbox(category)
-					imgui.table_next_column()
 					changed_gran, self.granularity_type, self.granularity_count = input_granularity("Granularity", (self.granularity_type, self.granularity_count))
 					if dirty:
 						self.analysis = None
@@ -131,4 +118,17 @@ class UI:
 							analysis=self.analysis,
 							size=imgui.get_content_region_avail()
 						)
+					imgui.table_next_column()
+					def recursive_checkbox(category : Category) -> bool:
+						_, category.active = imgui.checkbox(category.name, category.active)
+						if category.active and category.sub:
+							imgui.same_line()
+							with imgui_ctx.tree_node("##" + category.name) as tree:
+								if (tree):
+									for sub in category.sub:
+										recursive_checkbox(sub)
+							return True
+						return False
+					for category in categories:
+						recursive_checkbox(category)
 #endregion UI

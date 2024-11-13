@@ -12,7 +12,7 @@
 	- [x] Save
 	- [x] Import date range filtering
 	- [x] extract to module
-- [-] Categories edits
+- [x] Categories edits
 	- [x] Load
 	- [x] Save
 	- [x] New
@@ -21,14 +21,31 @@
 	- [x] Remove Category
 	- [x] filters
 		- [x] regex on column
-		- [ ] amount comparison
-			- [ ] ==
+		- [x] amount comparison
+			- [x] ==
 			- [x] >
 			- [x] <
-			- [ ] >=
-			- [ ] <=
-			- [ ] !=
-- [ ] Pinned autoimport
-- [ ] drag n drop loading
-- [ ] dashboard
+			- [x] >=
+			- [x] <=
+			- [x] !=
+- [ ] plot analysis : status tracking
 - [ ] logging console
+- [ ] UX quality pass
+	- [ ] Pinned autoimport / opening last state before closing
+	- [ ] drag n drop loading
+	- [ ] multi selects
+	- [ ] renaming
+	- [ ] keybinds
+		- [ ] delete
+		- [ ] ctrl+x/c/v
+		- [ ] arrows
+		- [ ] save
+		- [ ] open file
+		- [ ] window navigation
+		- [ ] rename
+- [ ] dashboard
+- [ ] project visibility
+	- [ ] readme
+	- [ ] user tests
+	- [ ] executable
+	- [ ] upload
