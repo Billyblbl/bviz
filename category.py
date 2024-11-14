@@ -134,7 +134,8 @@ class UI:
 		return True
 
 	def use_all_categories(self) -> bool:
-		(self.use_category(blueprint) for blueprint in self.blueprints)
+		for blueprint in self.blueprints:
+			self.use_category(blueprint)
 		return True
 
 	def reset_used(self) -> None:

@@ -30,7 +30,7 @@
 			- [x] !=
 - [x] plot analysis : status tracking
 - [x] window bar menu controls
-- [ ] refactor menu controls into respective modules
+- [x] refactor menu controls into respective modules
 - [ ] file format versionings
 - [ ] logging console
 - [ ] UX quality pass
@@ -47,6 +47,9 @@
 		- [ ] window navigation
 		- [ ] rename
 - [ ] dashboard
+- [ ] source csv format research
+	- [ ] check other banks
+	- [ ] confirm current format
 - [ ] project visibility
 	- [ ] readme
 	- [ ] user tests

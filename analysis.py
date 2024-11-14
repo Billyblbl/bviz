@@ -151,7 +151,8 @@ class UI:
 			self.dump_target = None
 		with imgui_ctx.begin(title) as window:
 			if window and analysis and len(analysis) > 0:
-				self.dump_button("Dump", analysis)
+				if imgui.button("Dump"):
+					self.dump(analysis)
 				plot_analysis(
 					categories=categories,
 					analysis=analysis,
