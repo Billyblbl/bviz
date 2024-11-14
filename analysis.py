@@ -1,5 +1,5 @@
 import csv
-from enum import Enum
+from datetime import datetime
 from typing import Optional
 from imgui_bundle import portable_file_dialogs as pfd #type: ignore
 from imgui_bundle import imgui, implot, ImVec2, imgui_ctx
@@ -9,19 +9,20 @@ from imports import Import, amount
 from schedule import Timespan, Granularity
 
 class Report:
-	def __init__(self, timespan : Timespan, movements : float, status : Optional[float], categorised : dict):
+	def __init__(self, timespan : Timespan, movements : float, status : Optional[tuple[datetime, float]], categorised : dict):
 		self.timespan : Timespan = timespan
 		self.movements : float = movements
-		self.status : Optional[float] = status
+		self.status : Optional[tuple[datetime, float]] = status
 		self.categorised : dict = categorised #* flattened from categories
 
 	@staticmethod
 	def from_section(section : Import.Section, categories : list):
 		movements = [entry for entry in section.entries if entry['account'] == '']
+		status_entry = next(iter(entry for entry in section.entries if entry['account'] != ''), None)
 		return Report(
 			timespan=section.timespan,
 			movements=sum(amount(r) for r in movements),
-			status=next(iter(amount(entry) for entry in section.entries if entry['account'] != ''), None),#* only sometimes present in a section
+			status=(datetime.strptime(status_entry['date'], "%d/%m/%Y"), amount(status_entry)) if status_entry else None,#* only sometimes present in a section
 			categorised=categorise("", movements, categories),
 		)
 
@@ -44,8 +45,8 @@ def dump_reports(reports: list[Report], filename: str) -> None:
 
 def plot_analysis(categories :  list[Category], analysis : list[Report], size : ImVec2 = ImVec2(0, 0)) -> None:
 	size = size if size.x > 0 or size.y > 0 else imgui.get_content_region_avail()
-	implot.begin_plot("My Plot", size)
-	implot.setup_axes("Time", "Movement EUR")
+	implot.begin_plot("categorical analysis", size)
+	implot.setup_axes("Time", "EUR")
 	ticks = [r.timespan.span_str("%d/%m") for r in analysis]
 	if len(ticks) > 1:
 		implot.setup_axis_ticks(implot.ImAxis_.x1, 0.0, max(1, len(ticks)-1), len(ticks), ticks, False)
@@ -81,7 +82,6 @@ def input_granularity(title: str, granularity : tuple[Granularity, int]) -> tupl
 				changed = changed_type or changed_count
 	return changed, gran_type, max(1, gran_count)
 
-
 #region UI
 
 class UI:
@@ -89,46 +89,75 @@ class UI:
 	def __init__(self):
 		self.granularity_type : Granularity = Granularity.Month
 		self.granularity_count : int = 1
-		self.analysis : list[Report] = None
 		self.dump_save_dialog : pfd.save_file = None
 
-	def draw(self, title : str, imp : Import, categories : list[Category], dirty : bool = False) -> None:
+	def analyse(self, imp : Import, categories : list[Category]) -> list[Report]:
+		return analyse(imp, categories, self.granularity_type, self.granularity_count)
+
+	def draw_config(self, title : str, categories : list[Category] = []) -> bool:
+		changed_gran = False
 		with imgui_ctx.begin(title) as window:
 			if window:
-				with imgui_ctx.begin_table("##analysis table", 2, flags=imgui.TableFlags_.resizable):
-					imgui.table_next_column()
-					changed_gran, self.granularity_type, self.granularity_count = input_granularity("Granularity", (self.granularity_type, self.granularity_count))
-					if dirty:
-						self.analysis = None
-					if imp and (changed_gran or (not self.analysis)):
-						try:
-							self.analysis = analyse(imp, categories, self.granularity_type, self.granularity_count)
-						except Exception as e:
-							print("error", e)
-					if imp and imgui.button("Dump"):
-						self.dump_save_dialog = pfd.save_file("Save to", imp.filename + "-" + self.granularity_type.name + str(self.granularity_count) + "-analysis.csv", filters=["*.csv"])
-					if self.dump_save_dialog and self.dump_save_dialog.ready():
-						filepath = self.dump_save_dialog.result()
-						if (filepath):
-							dump_reports(self.analysis, filepath)
-						self.dump_save_dialog = None
-					if self.analysis:
-						plot_analysis(
-							categories=categories,
-							analysis=self.analysis,
-							size=imgui.get_content_region_avail()
+				changed_gran, self.granularity_type, self.granularity_count = input_granularity("Granularity", (self.granularity_type, self.granularity_count))
+				imgui.separator()
+				with imgui_ctx.begin_list_box("##categories"):
+					def recursive_checkbox(category : Category, parent_active : bool = True) -> None:
+						flags = (
+							(imgui.TreeNodeFlags_.selected if category.active and parent_active else 0) |
+							(imgui.TreeNodeFlags_.leaf if len(category.sub) == 0 else 0) |
+							imgui.TreeNodeFlags_.open_on_arrow |
+							imgui.TreeNodeFlags_.open_on_double_click
 						)
-					imgui.table_next_column()
-					def recursive_checkbox(category : Category) -> bool:
-						_, category.active = imgui.checkbox(category.name, category.active)
-						if category.active and category.sub:
-							imgui.same_line()
-							with imgui_ctx.tree_node("##" + category.name) as tree:
-								if (tree):
-									for sub in category.sub:
-										recursive_checkbox(sub)
-							return True
-						return False
+						tree = imgui.tree_node_ex(category.name, flags=flags)
+						if parent_active and imgui.is_item_clicked() and not imgui.is_item_toggled_open():
+							category.active = not category.active
+						if (tree):
+							for sub in category.sub:
+								recursive_checkbox(sub, parent_active and category.active)
+							imgui.tree_pop()
 					for category in categories:
 						recursive_checkbox(category)
+		return changed_gran
+
+	def dump_button(self, title : str = "Dump", analysis : list[Report] = []) -> None:
+		if imgui.button(title):
+			self.dump_save_dialog = pfd.save_file("Save to", "categorical_analysis-" + datetime.now().strftime("%d_%m_%Y") + "-" + self.granularity_type.name + "-" + str(self.granularity_count) + ".csv", filters=["*.csv"])
+		if self.dump_save_dialog and self.dump_save_dialog.ready():
+			filepath = self.dump_save_dialog.result()
+			if (filepath):
+				dump_reports(analysis, filepath)
+			self.dump_save_dialog = None
+
+	def draw_categorical(self, title : str, analysis :list[Report], categories : list[Category]) -> None:
+		with imgui_ctx.begin(title) as window:
+			if window and analysis and len(analysis) > 0:
+				self.dump_button("Dump", analysis)
+				plot_analysis(
+					categories=categories,
+					analysis=analysis,
+					size=imgui.get_content_region_avail()
+				)
+
+	def draw_status(self, title : str, analysis : list[Report]) -> None:
+		with imgui_ctx.begin(title) as window:
+			if window and analysis and len(analysis) > 0:
+				self.dump_button("Dump", analysis)
+				implot.begin_plot("Status tracking", imgui.get_content_region_avail())
+				implot.setup_axes("Time", "EUR")
+				implot.setup_axis_scale(implot.ImAxis_.x1, implot.Scale_.time)
+
+				implot.plot_line(
+					label_id="Amount",
+					xs=np.ascontiguousarray([report.status[0].timestamp() for report in analysis if report.status is not None]),
+					ys=np.ascontiguousarray([report.status[1] for report in analysis if report.status is not None])
+				)
+
+				implot.plot_line(
+					label_id="Income",
+					xs=np.ascontiguousarray([report.timespan.timestamp() for report in analysis]),
+					ys=np.ascontiguousarray([report.movements for report in analysis])
+				)
+
+				implot.end_plot()
+
 #endregion UI

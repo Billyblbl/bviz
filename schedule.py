@@ -31,20 +31,23 @@ class Timespan:
 				return Timespan(b=date.replace(month=1, day=1), e=(date + relativedelta(years=gran_count-1)).replace(month=12, day=31))
 
 	def __init__(self, b, e):
-		self.begin = b
-		self.end = e
+		self.begin : datetime = b
+		self.end : datetime = e
 
-	def __str__(self):
-		return self.begin.strftime("%d/%m/%Y") + "-" + self.end.strftime("%d/%m/%Y")
+	def timestamp(self) -> float:
+		return (self.begin.timestamp() + self.end.timestamp()) / 2.0
 
-	def begin_str(self, fmt : str = "%d/%m/%Y"):
+	def begin_str(self, fmt : str = "%d/%m/%Y") -> str:
 		return self.begin.strftime(fmt)
 
-	def end_str(self, fmt : str = "%d/%m/%Y"):
+	def end_str(self, fmt : str = "%d/%m/%Y") -> str:
 		return self.begin.strftime(fmt)
 
-	def span_str(self, fmt : str = "%d/%m/%Y", separator : str = "-"):
+	def span_str(self, fmt : str = "%d/%m/%Y", separator : str = "-") -> str:
 		return self.begin.strftime(fmt) + separator + self.end.strftime(fmt)
+
+	def __str__(self) -> str:
+		return self.span_str()
 
 	def sectionned(self, granularity : Granularity, count : int = 1) -> list:
 		it = Timespan(Timespan.from_date_granularity(self.begin, granularity, count).begin, Timespan.from_date_granularity(self.end, granularity, count).end)

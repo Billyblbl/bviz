@@ -178,6 +178,10 @@ class UI:
 						if imgui.button("Save"):
 							self.save_category(self.blueprints)
 						imgui.same_line()
+						if imgui.button("Use all"):
+							self.categories = [build_category_tree(blueprint) for blueprint in self.blueprints]
+							changed_used_categories = True
+						imgui.same_line()
 						if imgui.button("Reset"):
 							self.blueprints = []
 						with imgui_ctx.begin_list_box("##hierachy", imgui.get_content_region_avail()):

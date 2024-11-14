@@ -11,6 +11,7 @@ implot.create_context()
 import_ui = imports.UI()
 category_ui = category.UI()
 analysis_ui = analysis.UI()
+analysis_reports : list[analysis.Report] = []
 
 while app.run_frame():
 
@@ -30,11 +31,13 @@ while app.run_frame():
 
 	changed_selected_import, selected_import = import_ui.draw("Imports")
 	changed_categories, selected_categories = category_ui.draw("Categories")
-	analysis_ui.draw("Analysis",
-		imp=selected_import,
-		categories=selected_categories,
-		dirty=changed_selected_import or changed_categories
-	)
+	changed_config = analysis_ui.draw_config("Config", categories=selected_categories)
+
+	if (changed_selected_import or changed_categories or changed_config) and selected_import is not None and selected_categories is not None:
+		analysis_reports = analysis_ui.analyse(selected_import, selected_categories)
+
+	analysis_ui.draw_categorical("Analysis", analysis_reports, selected_categories)
+	analysis_ui.draw_status("Evolution", analysis_reports)
 
 	app.render()
 

@@ -30,6 +30,7 @@
 			- [x] !=
 - [ ] plot analysis : status tracking
 - [ ] logging console
+- [ ] file format versionings
 - [ ] UX quality pass
 	- [ ] Pinned autoimport / opening last state before closing
 	- [ ] drag n drop loading
