@@ -141,6 +141,22 @@ class UI:
 		self.categories = []
 		self.changed_categories = True
 
+	def menu(self, title : str):
+		with imgui_ctx.begin_menu(title, True) as menu:
+			if menu:
+				if imgui.menu_item("Load", None, None)[0]:
+					self.load_category()
+				if not self.categories:
+					imgui.begin_disabled()
+				if imgui.menu_item("Save", None, None)[0]:
+					self.save_category(self.categories)
+				if not self.categories:
+					imgui.end_disabled()
+				if imgui.menu_item("Use All", None, None)[0]:
+					self.use_all_categories()
+				if imgui.menu_item("Reset Used", None, None)[0]:
+					self.reset_used()
+
 	def draw(self, title : str = "Categories") -> tuple[bool, list[Category]]:
 		with imgui_ctx.begin(title) as window:
 			if window:

@@ -135,6 +135,7 @@ class UI:
 		self.selected_import : Import = None
 		self.selected_source_file : str = None
 		self.auto_select_import_dates : bool = False
+		self.changed_selected : bool = False
 
 	def load_imports(self) -> bool:
 		self.file_dialog = (UI.FileOperation.LOAD_IMPORTS, pfd.open_file("Select report file", filters=["*.json"], options=pfd.opt.multiselect))
@@ -185,7 +186,7 @@ class UI:
 			pressed = True
 			if self.selected_import == imp:
 				self.selected_import = None
-				changed_selected = True
+				self.changed_selected = True
 			self.imported.remove(imp)
 		if not imp:
 			imgui.end_disabled()
@@ -194,8 +195,26 @@ class UI:
 	def file_op_ready(self, operation) -> bool:
 		return self.file_dialog[0] == operation and self.file_dialog[1].ready()
 
+	def menu(self, title : str):
+		with imgui_ctx.begin_menu(title, True) as menu:
+			if menu:
+				if imgui.menu_item("New", None, None)[0]:
+					self.imported.append(Import())
+					self.selected_import = self.imported[-1]
+					self.changed_selected = True
+				if imgui.menu_item("Load", None, None)[0]:
+					self.load_imports()
+				if imgui.menu_item("Reload", None, None)[0]:
+					for imp in self.imported:
+						imp.load()
+				if not self.selected_import:
+					imgui.begin_disabled()
+				if imgui.menu_item("Save", None, None)[0]:
+					self.save_import(self.selected_import)
+				if not self.selected_import:
+					imgui.end_disabled()
+
 	def draw(self, title : str = "Imports") -> tuple[bool, Import]:
-		changed_selected = False
 		with imgui_ctx.begin(title) as window:
 			if window:
 				with imgui_ctx.begin_table("##imports table", 3, flags=imgui.TableFlags_.resizable):
@@ -204,7 +223,7 @@ class UI:
 					if imgui.button("New"):
 						self.imported.append(Import())
 						self.selected_import = self.imported[-1]
-						changed_selected = True
+						self.changed_selected = True
 					imgui.same_line()
 					self.save_button(self.selected_import)
 					if self.file_op_ready(UI.FileOperation.SAVE_IMPORTS):
@@ -212,7 +231,7 @@ class UI:
 						if filepath:
 							print(filepath)
 							self.selected_import.save(filename=filepath)
-							changed_selected = True
+							self.changed_selected = True
 						self.file_dialog = UI.FileOperation.make_noop()
 						self.file_op_target = None
 					imgui.same_line()
@@ -222,7 +241,7 @@ class UI:
 							print(filepath)
 							self.imported.append(Import.from_file(filepath))
 						self.selected_import = self.imported[-1]
-						changed_selected = True
+						self.changed_selected = True
 						self.file_dialog = UI.FileOperation.make_noop()
 					imgui.same_line()
 					self.reload_button(self.selected_import)
@@ -238,7 +257,7 @@ class UI:
 									_, selected = imgui.selectable(path.basename(import_data.filename), self.selected_import.filename == import_data.filename if self.selected_import else False, imgui.SelectableFlags_.allow_double_click)
 									if selected:
 										self.selected_import = import_data
-										changed_selected = True
+										self.changed_selected = True
 									imgui.table_next_column()
 									self.save_button(import_data)
 									imgui.same_line()
@@ -248,7 +267,7 @@ class UI:
 						if imgui.button("+"):
 							self.imported.append(Import())
 							self.selected_import = self.imported[-1]
-							changed_selected = True
+							self.changed_selected = True
 						imgui.same_line()
 						if imgui.button("Load"):
 							self.file_dialog = (UI.FileOperation.LOAD_IMPORTS, pfd.open_file("Select report file", filters=["*.json"], options=pfd.opt.multiselect))
@@ -273,7 +292,7 @@ class UI:
 						changed, self.selected_import.end = input_date("End", self.selected_import.end)
 						if changed and self.selected_import.valid():
 							self.selected_import.load_entries()
-							changed_selected = True
+							self.changed_selected = True
 						if self.auto_select_import_dates and len(self.selected_import.files) > 0:
 							imgui.end_disabled()
 
@@ -291,7 +310,7 @@ class UI:
 										if imgui.button("X"):
 											self.selected_import.files.remove(file)
 											self.selected_import.load_entries()
-											changed_selected = True
+											self.changed_selected = True
 											self.selected_source_file = None
 							if (imgui.button("+")):
 								self.try_select_sources()
@@ -299,7 +318,7 @@ class UI:
 								for filepath in self.file_dialog[1].result():
 									self.selected_import.files.append(filepath)
 								self.selected_import.load_entries()
-								changed_selected = True
+								self.changed_selected = True
 								self.file_dialog = UI.FileOperation.make_noop()
 					#endregion import config column
 
@@ -317,6 +336,6 @@ class UI:
 									for c in columns:
 										imgui.table_next_column()
 										imgui.text(entry[c])
-		return changed_selected, self.selected_import
-				#endregion import contents column
+					#endregion import contents column
+		return self.changed_selected, self.selected_import
 # endregion ui

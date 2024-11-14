@@ -99,6 +99,20 @@ class UI:
 	def analyse(self, imp : Import, categories : list[Category]) -> list[Report]:
 		return analyse(imp, categories, self.granularity_type, self.granularity_count)
 
+	def menu(self, title : str, analysis : list[Report], can_analyse : bool) -> bool:
+		should_analyse = False
+		with imgui_ctx.begin_menu(title, True) as menu:
+			if menu:
+				if not can_analyse:
+					imgui.begin_disabled()
+				if imgui.menu_item("Run", None, None)[0]:
+					should_analyse = True
+				if not can_analyse:
+					imgui.end_disabled()
+				if imgui.menu_item("Dump", None, None)[0]:
+					self.dump(analysis)
+		return should_analyse
+
 	def draw_config(self, title : str, categories : list[Category] = []) -> bool:
 		changed_gran = False
 		with imgui_ctx.begin(title) as window:
