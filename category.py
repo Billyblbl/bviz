@@ -110,21 +110,38 @@ class UI:
 		self.file_op = None
 		self.file_op_target = None
 		self.selection_blueprints = None
+		self.changed_categories = False
 
 	class FileOp(Enum):
 		LOAD = 0
 		SAVE = 1
 
-	def load_category(self, destination) -> CategoryBlueprint:
+	def load_category(self, destination = None) -> CategoryBlueprint:
 		self.file_op = (UI.FileOp.LOAD, pfd.open_file("Select category file", filters=["*.json"]))
 		self.file_op_target = destination
+		if not self.file_op_target:
+			self.file_op_target = self.blueprints
 
-	def save_category(self, blueprints : list[CategoryBlueprint]) -> None:
+	def save_category(self, blueprints : list[CategoryBlueprint] = None) -> None:
 		self.file_op = (UI.FileOp.SAVE, pfd.save_file("Save category", "-".join([cat.name for cat in blueprints]) + ".json", filters=["*.json"]))
 		self.file_op_target = blueprints
+		if not self.file_op_target:
+			self.file_op_target = self.blueprints
+
+	def use_category(self, category : CategoryBlueprint) -> bool:
+		self.categories.append(build_category_tree(category))
+		self.changed_categories = True
+		return True
+
+	def use_all_categories(self) -> bool:
+		(self.use_category(blueprint) for blueprint in self.blueprints)
+		return True
+
+	def reset_used(self) -> None:
+		self.categories = []
+		self.changed_categories = True
 
 	def draw(self, title : str = "Categories") -> tuple[bool, list[Category]]:
-		changed_used_categories = False
 		with imgui_ctx.begin(title) as window:
 			if window:
 				if self.file_op:
@@ -158,7 +175,7 @@ class UI:
 					with table_push_column("##Used categories column"):
 						if imgui.button("Reset"):
 							self.categories = []
-							changed_used_categories = True
+							self.changed_categories = True
 						with imgui_ctx.begin_list_box("##blueprints", imgui.get_content_region_avail()):
 							with imgui_ctx.begin_table("##blueprints content", 2, flags=imgui.TableFlags_.resizable):
 								for category in self.categories:
@@ -169,7 +186,7 @@ class UI:
 										imgui.table_next_column()
 										if imgui.button("X"):
 											self.categories.remove(category)
-											changed_used_categories
+											self.changed_categories
 
 					with table_push_column("##category blueprint hierarchy column"):
 						if imgui.button("Load"):
@@ -179,8 +196,7 @@ class UI:
 							self.save_category(self.blueprints)
 						imgui.same_line()
 						if imgui.button("Use all"):
-							self.categories = [build_category_tree(blueprint) for blueprint in self.blueprints]
-							changed_used_categories = True
+							self.changed_categories = self.use_all_categories()
 						imgui.same_line()
 						if imgui.button("Reset"):
 							self.blueprints = []
@@ -205,8 +221,7 @@ class UI:
 												self.load_category(blueprint.sub)
 											imgui.same_line()
 											if imgui.button("Use"):
-												self.categories.append(build_category_tree(blueprint))
-												changed_rec = True
+												changed_rec = self.use_category(blueprint)
 											imgui.same_line()
 											if imgui.button("Save"):
 												self.save_category([blueprint])
@@ -219,7 +234,7 @@ class UI:
 											changed_rec |= recursive_blueprints_edit(blueprint.sub)
 											imgui.unindent()
 									return changed_rec
-								changed_used_categories |= recursive_blueprints_edit(self.blueprints)
+								self.changed_categories |= recursive_blueprints_edit(self.blueprints)
 								imgui.table_next_row()
 								imgui.table_next_column()
 								if imgui.button("+"):
@@ -264,4 +279,4 @@ class UI:
 							imgui.input_text("Config", "")
 							imgui.end_disabled()
 
-		return changed_used_categories, self.categories
+		return self.changed_categories, self.categories

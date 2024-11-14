@@ -29,8 +29,10 @@
 			- [x] <=
 			- [x] !=
 - [x] plot analysis : status tracking
-- [ ] logging console
+- [x] window bar menu controls
+- [ ] refactor menu controls into respective modules
 - [ ] file format versionings
+- [ ] logging console
 - [ ] UX quality pass
 	- [ ] Pinned autoimport / opening last state before closing
 	- [ ] drag n drop loading

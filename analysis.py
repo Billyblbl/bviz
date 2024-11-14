@@ -90,6 +90,11 @@ class UI:
 		self.granularity_type : Granularity = Granularity.Month
 		self.granularity_count : int = 1
 		self.dump_save_dialog : pfd.save_file = None
+		self.dump_target : list[Report] = None
+
+	@staticmethod
+	def can_analyse(imp : Import, categories : list[Category]) -> bool:
+		return imp is not None and imp.valid() and categories is not None
 
 	def analyse(self, imp : Import, categories : list[Category]) -> list[Report]:
 		return analyse(imp, categories, self.granularity_type, self.granularity_count)
@@ -119,16 +124,17 @@ class UI:
 						recursive_checkbox(category)
 		return changed_gran
 
-	def dump_button(self, title : str = "Dump", analysis : list[Report] = []) -> None:
-		if imgui.button(title):
-			self.dump_save_dialog = pfd.save_file("Save to", "categorical_analysis-" + datetime.now().strftime("%d_%m_%Y") + "-" + self.granularity_type.name + "-" + str(self.granularity_count) + ".csv", filters=["*.csv"])
+	def dump(self, analysis : list[Report]) -> None:
+		self.dump_save_dialog = pfd.save_file("Save to", "categorical_analysis-" + datetime.now().strftime("%d_%m_%Y") + "-" + self.granularity_type.name + "-" + str(self.granularity_count) + ".csv", filters=["*.csv"])
+		self.dump_target = analysis
+
+	def draw_categorical(self, title : str, analysis :list[Report], categories : list[Category]) -> None:
 		if self.dump_save_dialog and self.dump_save_dialog.ready():
 			filepath = self.dump_save_dialog.result()
 			if (filepath):
 				dump_reports(analysis, filepath)
 			self.dump_save_dialog = None
-
-	def draw_categorical(self, title : str, analysis :list[Report], categories : list[Category]) -> None:
+			self.dump_target = None
 		with imgui_ctx.begin(title) as window:
 			if window and analysis and len(analysis) > 0:
 				self.dump_button("Dump", analysis)
@@ -141,7 +147,8 @@ class UI:
 	def draw_status(self, title : str, analysis : list[Report]) -> None:
 		with imgui_ctx.begin(title) as window:
 			if window and analysis and len(analysis) > 0:
-				self.dump_button("Dump", analysis)
+				if imgui.button("Dump"):
+					self.dump(analysis)
 				implot.begin_plot("Status tracking", imgui.get_content_region_avail())
 				implot.setup_axes("Time", "EUR")
 				implot.setup_axis_scale(implot.ImAxis_.x1, implot.Scale_.time)
