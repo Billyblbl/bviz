@@ -28,7 +28,7 @@
 			- [x] >=
 			- [x] <=
 			- [x] !=
-- [ ] plot analysis : status tracking
+- [x] plot analysis : status tracking
 - [ ] logging console
 - [ ] file format versionings
 - [ ] UX quality pass
