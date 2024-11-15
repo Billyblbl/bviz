@@ -30,7 +30,7 @@ class Timespan:
 			case Granularity.Year:
 				return Timespan(b=date.replace(month=1, day=1), e=(date + relativedelta(years=gran_count-1)).replace(month=12, day=31))
 
-	def __init__(self, b, e):
+	def __init__(self, b : datetime, e : datetime):
 		self.begin : datetime = b
 		self.end : datetime = e
 

@@ -34,8 +34,10 @@ while app.run_frame():
 
 		import_ui.menu("Imports")
 		category_ui.menu("Categories")
-		if analysis_ui.menu("Analysis", analysis_reports, analysis_ui.can_analyse(import_ui.selected_import, category_ui.categories)):
-			analysis_reports = analysis_ui.analyse(import_ui.selected_import, category_ui.categories)
+		if analysis_ui.menu("Analysis", analysis_reports, analysis_ui.can_analyse(import_ui.get_selection(), category_ui.categories)):
+			analysis_reports = analysis_ui.analyse(import_ui.get_selection(), category_ui.categories)
+			console.log("default", "main", f"Analysed : {len(analysis_reports)} reports")
+			console.log("default", "main", f"Analysis reason : manual")
 		force_scroll_console = console_ui.menu("Console")
 
 		with imgui_ctx.begin_menu("View", True) as menu:
@@ -59,6 +61,12 @@ while app.run_frame():
 	if (changed_selected_import or changed_categories or changed_config) and analysis_ui.can_analyse(selected_import, selected_categories):
 		analysis_reports = analysis_ui.analyse(selected_import, selected_categories)
 		console.log("default", "main", f"Analysed : {len(analysis_reports)} reports")
+		if changed_selected_import:
+			console.log("default", "main", f"Analysis reason : changed_selected_import")
+		if changed_categories:
+			console.log("default", "main", f"Analysis reason : changed_categories")
+		if changed_config:
+			console.log("default", "main", f"Analysis reason : changed_config")
 
 	if opened_analysis_categorical_window:
 		analysis_ui.draw_categorical("Analysis", analysis_reports, selected_categories)

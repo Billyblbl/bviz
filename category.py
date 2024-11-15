@@ -144,6 +144,7 @@ class UI:
 		self.changed_categories = True
 
 	def menu(self, title : str):
+		self.changed_categories = False
 		with imgui_ctx.begin_menu(title, True) as menu:
 			if menu:
 				if imgui.menu_item("Load", None, None)[0]:

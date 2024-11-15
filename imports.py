@@ -1,13 +1,12 @@
-
 import csv
 from datetime import datetime
 from enum import Enum
-import json
 from os import path
 from schedule import Timespan, Granularity, input_date
 from imgui_bundle import portable_file_dialogs as pfd #type: ignore
 from imgui_bundle import imgui, imgui_ctx
-from console import log
+from console import log, LogEntry as Log
+from vjf import VID, FormatMap, Format, FileSlot
 
 bank_statement_fields = ["date", "amount", "type", "account", "label_out", "label_in", "tbd", "note"]
 def read_bank_statement(filename) -> list[dict]:
@@ -15,74 +14,55 @@ def read_bank_statement(filename) -> list[dict]:
 		reader = csv.DictReader(file, fieldnames=bank_statement_fields, delimiter=';')
 		return [row for row in reader]
 
+def load_entries(files : list[str], flt : Timespan | None = None) -> list[dict]:
+	entries = []
+	for f in files:
+		entries.extend(read_bank_statement(f))
+	if flt is not None:
+		entries = [e for e in entries if datetime.strptime(e['date'], "%d/%m/%Y") >= flt.begin and datetime.strptime(e['date'], "%d/%m/%Y") <= flt.end]
+	return entries
+
 class Import:
 
-	def __init__(self, filename : str = None):
-		self.filename : str = filename if filename else "unsaved.json"
-		self.begin : datetime = None
-		self.end : datetime = None
-		self.files: list[str] = []
-		self.entries : list[dict] = []
-		if filename:
-			self.load(filename)
+	def __init__(self, begin : datetime = None, end : datetime = None, files : list[str] = [], entries : list[dict] = []):
+		self.begin : datetime = begin
+		self.end : datetime = end
+		self.files: list[str] = files
+		self.entries : list[dict] = entries
 
-	@staticmethod
-	def from_file(filename, datetime_fmt = "%Y/%m/%d") -> "Import":
-		new = Import()
-		new.load(filename, datetime_fmt=datetime_fmt)
-		return new
-
-	def to_dict(self, datetime_fmt = "%d/%m/%Y"):
+	def to_dict(self, pwd : str, datetime_fmt = "%Y/%m/%d"):
 		if self.begin is None or self.end is None:
 			raise Exception("Timespan not set")
 		return {
 			'begin' : self.begin.strftime(datetime_fmt),
 			'end' : self.end.strftime(datetime_fmt),
-			'files' : [path.relpath(f, path.dirname(self.filename)) for f in self.files],
+			'files' : [path.relpath(f, pwd) for f in self.files],
 		}
+
+	@staticmethod
+	def from_dict(data : dict, pwd : str, datetime_fmt = "%Y/%m/%d"):
+		files = [pwd + '/' + f for f in data['files']]
+		return Import(
+			begin=datetime.strptime(data['begin'], datetime_fmt),
+			end=datetime.strptime(data['end'], datetime_fmt),
+			files=files,
+			entries=load_entries(files=files, flt=Timespan(
+				datetime.strptime(data['begin'], datetime_fmt).replace(hour=0, minute=0, second=0),
+				datetime.strptime(data['end'], datetime_fmt).replace(hour=23, minute=59, second=59),
+			))
+		)
 
 	def valid(self) -> bool:
 		return self.begin is not None and self.end is not None
 
-	def save(self, filename: str = None, datetime_fmt : str = "%Y/%m/%d"):
-		try:
-			if filename:
-				self.filename = filename
-			with open(self.filename, 'w') as out:
-				json.dump(self.to_dict(datetime_fmt=datetime_fmt), out)
-		except Exception as e:
-			log("default", "imports", f"failed to save {self.filename} : {e}")
-
-	def load(self, filename = None, datetime_fmt = "%Y/%m/%d"):
-		try:
-			if filename:
-				self.filename = filename
-			with open(self.filename) as inp:
-				if inp is None:
-					raise Exception("File not found")
-				data = json.load(inp)
-				self.begin = datetime.strptime(data['begin'], datetime_fmt)
-				self.end = datetime.strptime(data['end'], datetime_fmt)
-				self.files = [path.dirname(self.filename) + '/' + f for f in data['files']]
-				self.load_entries()
-		except Exception as e:
-			log("default", "imports", f"failed to load {self.filename} : {e}")
-
-	def read_entries(self, apply_filter = True):
-		entries = []
-		[entries := entries + read_bank_statement(f) for f in self.files]
-		if apply_filter and self.valid():
-			entries = [e for e in entries if datetime.strptime(e['date'], "%d/%m/%Y") >= self.begin and datetime.strptime(e['date'], "%d/%m/%Y") <= self.end]
-		return entries
-
 	def load_entries(self):
-		self.entries = self.read_entries()
+		self.entries = load_entries(files=self.files, flt=Timespan(self.begin, self.end) if self.begin and self.end else None)
 
 	def section(self, timespan : Timespan):
 		return filter(lambda e: e['date'] >= timespan.begin and e['date'] <= timespan.end, self.entries())
 
 	def select_dates_from_contents(self):
-		entries = self.read_entries(apply_filter=False)
+		entries = load_entries(self.files)
 		self.begin = min(datetime.strptime(e['date'], "%d/%m/%Y") for e in entries)
 		self.end = max(datetime.strptime(e['date'], "%d/%m/%Y") for e in entries)
 
@@ -116,6 +96,13 @@ def amount(entry : dict) -> float:
 def from_specific(entry : dict, person : str) -> bool:
 	return person in entry['label_in'] or person in entry['label_out']
 
+FormatMap["bankviz-import"] = Format(
+	id="bankviz-import",
+	version=VID(0, 1, 0),
+	parser=lambda data, _, filepath: Import.from_dict(data, path.dirname(filepath)),
+	serialiser=lambda imp, filepath: imp.to_dict(path.dirname(filepath))
+)
+
 # region UI
 class UI:
 
@@ -130,9 +117,9 @@ class UI:
 
 	def __init__(self):
 		self.file_dialog : tuple[UI.FileOperation, pfd.open_file | pfd.save_file] = UI.FileOperation.make_noop()
-		self.file_op_target : Import = None
-		self.imported : list[Import] = []
-		self.selected_import : Import = None
+		self.file_op_target : FileSlot = None
+		self.imported : list[FileSlot] = []
+		self.selected_import : FileSlot = None
 		self.selected_source_file : str = None
 		self.auto_select_import_dates : bool = False
 		self.changed_selected : bool = False
@@ -140,35 +127,35 @@ class UI:
 	def load_imports(self) -> bool:
 		self.file_dialog = (UI.FileOperation.LOAD_IMPORTS, pfd.open_file("Select report file", filters=["*.json"], options=pfd.opt.multiselect))
 
-	def save_import(self, imp : Import) -> bool:
-		self.file_dialog = (UI.FileOperation.SAVE_IMPORTS, pfd.save_file("Save as", imp.filename, filters=["*.json"]))
+	def save_import(self, imp : FileSlot) -> bool:
+		self.file_dialog = (UI.FileOperation.SAVE_IMPORTS, pfd.save_file("Save as", imp.path, filters=["*.json"]))
 		self.file_op_target = imp
 
 	def try_select_sources(self) -> bool:
 		if self.selected_import:
 			self.file_dialog = (UI.FileOperation.SECLECT_SOURCES, pfd.open_file("Select source files", filters=["*.csv"], options=pfd.opt.multiselect))
 		else:
-			log("default", "imports", "No import selected")
+			log("default", "imports", "No import selected", Log.Level.WARN)
 
-	def save_button(self, imp : Import) -> bool:
+	def save_button(self, imp : FileSlot) -> bool:
 		pressed = False
-		if not imp or not imp.valid():
+		if not imp or not imp.content.valid():
 			imgui.begin_disabled()
 		if imgui.button("Save"):
 			pressed = True
 			self.save_import(imp)
-		if not imp or not imp.valid():
+		if not imp or not imp.content.valid():
 			imgui.end_disabled()
 		return pressed
 
-	def reload_button(self, imp : Import) -> bool:
+	def reload_button(self, imp : FileSlot) -> bool:
 		pressed = False
-		if not imp or not imp.valid():
+		if not imp or not imp.content.valid():
 			imgui.begin_disabled()
 		if imgui.button("Reload"):
 			pressed = True
 			imp.load()
-		if not imp or not imp.valid():
+		if not imp or not imp.content.valid():
 			imgui.end_disabled()
 		return pressed
 
@@ -178,7 +165,7 @@ class UI:
 			self.load_imports()
 		return pressed
 
-	def remove_button(self, imp : Import) -> bool:
+	def remove_button(self, imp : FileSlot) -> bool:
 		pressed = False
 		if not imp:
 			imgui.begin_disabled()
@@ -195,11 +182,15 @@ class UI:
 	def file_op_ready(self, operation) -> bool:
 		return self.file_dialog[0] == operation and self.file_dialog[1].ready()
 
+	def get_selection(self) -> Import | None:
+		return self.selected_import.content if self.selected_import else None
+
 	def menu(self, title : str):
+		self.changed_selected = False
 		with imgui_ctx.begin_menu(title, True) as menu:
 			if menu:
 				if imgui.menu_item("New", None, None)[0]:
-					self.imported.append(Import())
+					self.imported.append(FileSlot(path="unsaved.json", format_id="bankviz-import", content=Import()))
 					self.selected_import = self.imported[-1]
 					self.changed_selected = True
 				if imgui.menu_item("Load", None, None)[0]:
@@ -221,7 +212,7 @@ class UI:
 					#region imports list column
 					imgui.table_next_column()
 					if imgui.button("New"):
-						self.imported.append(Import())
+						self.imported.append(FileSlot(path="unsaved.json", format_id="bankviz-import", content=Import()))
 						self.selected_import = self.imported[-1]
 						self.changed_selected = True
 					imgui.same_line()
@@ -229,7 +220,7 @@ class UI:
 					if self.file_op_ready(UI.FileOperation.SAVE_IMPORTS):
 						filepath = self.file_dialog[1].result()
 						if filepath:
-							self.selected_import.save(filename=filepath)
+							self.selected_import.save(path_override=filepath)
 							self.changed_selected = True
 						self.file_dialog = UI.FileOperation.make_noop()
 						self.file_op_target = None
@@ -237,8 +228,8 @@ class UI:
 					self.load_button()
 					if self.file_op_ready(UI.FileOperation.LOAD_IMPORTS):
 						for filepath in self.file_dialog[1].result():
-							self.imported.append(Import.from_file(filepath))
-						self.selected_import = self.imported[-1]
+							self.imported.append(FileSlot.from_file(filepath, format_id="bankviz-import"))
+						self.selected_import = self.imported[-1] if len(self.imported) > 0 else None
 						self.changed_selected = True
 						self.file_dialog = UI.FileOperation.make_noop()
 					imgui.same_line()
@@ -248,14 +239,15 @@ class UI:
 
 					with imgui_ctx.begin_list_box("##imports", imgui.get_content_region_avail()):
 						with imgui_ctx.begin_table('##import entry', 2, flags=imgui.TableFlags_.resizable):
-							for import_data in self.imported:
-								with imgui_ctx.push_id(import_data.filename):
+							for import_data, idx in zip(self.imported, range(len(self.imported))):
+								with imgui_ctx.push_id(idx):
 									imgui.table_next_row()
 									imgui.table_next_column()
-									_, selected = imgui.selectable(path.basename(import_data.filename), self.selected_import.filename == import_data.filename if self.selected_import else False, imgui.SelectableFlags_.allow_double_click)
+									just, selected = imgui.selectable(path.basename(import_data.path), self.selected_import.path == import_data.path if self.selected_import else False, imgui.SelectableFlags_.allow_double_click)
 									if selected:
 										self.selected_import = import_data
-										self.changed_selected = True
+										if just:
+											self.changed_selected = True
 									imgui.table_next_column()
 									self.save_button(import_data)
 									imgui.same_line()
@@ -263,7 +255,7 @@ class UI:
 									imgui.same_line()
 									self.remove_button(import_data)
 						if imgui.button("+"):
-							self.imported.append(Import())
+							self.imported.append(FileSlot(path="unsaved.json", format_id="bankviz-import", content=Import()))
 							self.selected_import = self.imported[-1]
 							self.changed_selected = True
 						imgui.same_line()
@@ -274,30 +266,30 @@ class UI:
 					#region import config column
 					imgui.table_next_column()
 					if (self.selected_import):
-						if len(self.selected_import.files) == 0:
+						if len(self.get_selection().files) == 0:
 							imgui.begin_disabled()
 						if imgui.button("Select dates from contents"):
-							self.selected_import.select_dates_from_contents()
-						if len(self.selected_import.files) == 0:
+							self.get_selection().select_dates_from_contents()
+						if len(self.get_selection().files) == 0:
 							imgui.end_disabled()
 						imgui.same_line()
 						_, self.auto_select_import_dates = imgui.checkbox("Auto", self.auto_select_import_dates)
 
-						if self.auto_select_import_dates and len(self.selected_import.files) > 0:
-							self.selected_import.select_dates_from_contents()
+						if self.auto_select_import_dates and len(self.get_selection().files) > 0:
+							self.get_selection().select_dates_from_contents()
 							imgui.begin_disabled()
-						changed, self.selected_import.begin = input_date("Begin", self.selected_import.begin)
-						changed, self.selected_import.end = input_date("End", self.selected_import.end)
-						if changed and self.selected_import.valid():
-							self.selected_import.load_entries()
+						changed, self.get_selection().begin = input_date("Begin", self.get_selection().begin)
+						changed, self.get_selection().end = input_date("End", self.get_selection().end)
+						if changed and self.get_selection().valid():
+							self.get_selection().load_entries()
 							self.changed_selected = True
-						if self.auto_select_import_dates and len(self.selected_import.files) > 0:
+						if self.auto_select_import_dates and len(self.get_selection().files) > 0:
 							imgui.end_disabled()
 
 					with imgui_ctx.begin_list_box("##imports files box", imgui.get_content_region_avail()):
 						if self.selected_import:
 							with imgui_ctx.begin_table("##import files entry table", 2, flags=imgui.TableFlags_.resizable):
-								for file in self.selected_import.files:
+								for file in self.get_selection().files:
 									with imgui_ctx.push_id(file):
 										imgui.table_next_row()
 										imgui.table_next_column()
@@ -306,16 +298,16 @@ class UI:
 											self.selected_source_file = file
 										imgui.table_next_column()
 										if imgui.button("X"):
-											self.selected_import.files.remove(file)
-											self.selected_import.load_entries()
+											self.get_selection().files.remove(file)
+											self.get_selection().load_entries()
 											self.changed_selected = True
 											self.selected_source_file = None
 							if (imgui.button("+")):
 								self.try_select_sources()
 							if self.file_op_ready(UI.FileOperation.SECLECT_SOURCES):
 								for filepath in self.file_dialog[1].result():
-									self.selected_import.files.append(filepath)
-								self.selected_import.load_entries()
+									self.get_selection().files.append(filepath)
+								self.get_selection().load_entries()
 								self.changed_selected = True
 								self.file_dialog = UI.FileOperation.make_noop()
 					#endregion import config column
@@ -323,17 +315,18 @@ class UI:
 					#region import contents column
 					imgui.table_next_column()
 					with imgui_ctx.begin_list_box("##imports contents box", imgui.get_content_region_avail()):
-						if self.selected_import and self.selected_import.entries:
-							columns = self.selected_import.entries[0].keys()
+						if self.selected_import and self.get_selection().entries:
+							columns = self.get_selection().entries[0].keys()
 							with imgui_ctx.begin_table("##import contents table", len(columns), flags=imgui.TableFlags_.resizable):
 								for c in columns:
 									imgui.table_setup_column(c)
 								imgui.table_headers_row()
-								for entry in self.selected_import.entries:
+								for entry in self.get_selection().entries:
 									imgui.table_next_row()
 									for c in columns:
 										imgui.table_next_column()
 										imgui.text(entry[c])
 					#endregion import contents column
-		return self.changed_selected, self.selected_import
+		return self.changed_selected, self.get_selection()
+
 # endregion ui

@@ -32,7 +32,12 @@
 - [x] window bar menu controls
 - [x] refactor menu controls into respective modules
 - [ ] file format versionings
-- [ ] logging console
+	- [x] standard file format
+	- [x] file format mapping
+	- [x] Import conversion
+	- [ ] CategoryBlueprint conversion
+	- [ ] report dirty state
+- [x] logging console
 - [ ] UX quality pass
 	- [ ] Pinned autoimport / opening last state before closing
 	- [ ] drag n drop loading
