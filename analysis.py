@@ -7,6 +7,7 @@ import numpy as np
 from category import Category, categorise
 from imports import Import, amount
 from schedule import Timespan, Granularity
+from console import log
 
 class Report:
 	def __init__(self, timespan : Timespan, movements : float, status : Optional[tuple[datetime, float]], categorised : dict):
@@ -37,7 +38,7 @@ def analyse(imp: Import, categories : list[Category], granularity : Granularity,
 	return [Report.from_section(s, categories) for s in imp.sectionned(granularity, count)]
 
 def dump_reports(reports: list[Report], filename: str) -> None:
-	print("dumping to " + filename)
+	log("default", "analysis", "dumping to " + filename)
 	with open(filename, 'w', newline='') as output:
 		writer = csv.DictWriter(output, fieldnames=reports[0].to_dict().keys(), delimiter=',')
 		writer.writeheader()

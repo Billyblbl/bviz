@@ -6,6 +6,7 @@ from imports import amount
 import re
 from imgui_bundle import portable_file_dialogs as pfd #type: ignore
 from imgui_bundle import imgui, imgui_ctx
+from console import log
 
 class Category:
 	def __init__(self, name, predicate = lambda _: False, sub = []):
@@ -93,7 +94,7 @@ def build_category_tree(blueprint : CategoryBlueprint) -> Category:
 			if res:
 				predicate = res
 			else:
-				print("invalid custom predicate for {blueprint.name}: lambda entry: ".format(blueprint=blueprint), blueprint.config)
+				log("default", "category", f"invalid custom predicate for {blueprint.name}: lambda entry: {blueprint.config}")
 				predicate = lambda _: False
 	subs = [build_category_tree(sub) for sub in blueprint.sub]
 	return Category(blueprint.name, predicate, subs)
@@ -175,7 +176,7 @@ class UI:
 												self.file_op_target.append(CategoryBlueprint.from_dict(d))
 												self.selection_blueprints = self.file_op_target[-1]
 									except Exception as e:
-										print("failed to load {} : {}".format(filepath, e))
+										log("default", "category", f"failed to load {filepath} : {e}")
 								self.file_op = None
 								self.file_op_target = None
 						case UI.FileOp.SAVE:

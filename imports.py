@@ -7,6 +7,7 @@ from os import path
 from schedule import Timespan, Granularity, input_date
 from imgui_bundle import portable_file_dialogs as pfd #type: ignore
 from imgui_bundle import imgui, imgui_ctx
+from console import log
 
 bank_statement_fields = ["date", "amount", "type", "account", "label_out", "label_in", "tbd", "note"]
 def read_bank_statement(filename) -> list[dict]:
@@ -50,7 +51,7 @@ class Import:
 			with open(self.filename, 'w') as out:
 				json.dump(self.to_dict(datetime_fmt=datetime_fmt), out)
 		except Exception as e:
-			print(e)
+			log("default", "imports", f"failed to save {self.filename} : {e}")
 
 	def load(self, filename = None, datetime_fmt = "%Y/%m/%d"):
 		try:
@@ -65,7 +66,7 @@ class Import:
 				self.files = [path.dirname(self.filename) + '/' + f for f in data['files']]
 				self.load_entries()
 		except Exception as e:
-			print('failed to load {} : {}'.format(self.filename, e))
+			log("default", "imports", f"failed to load {self.filename} : {e}")
 
 	def read_entries(self, apply_filter = True):
 		entries = []
@@ -75,7 +76,6 @@ class Import:
 		return entries
 
 	def load_entries(self):
-		print("loading entries")
 		self.entries = self.read_entries()
 
 	def section(self, timespan : Timespan):
@@ -148,7 +148,7 @@ class UI:
 		if self.selected_import:
 			self.file_dialog = (UI.FileOperation.SECLECT_SOURCES, pfd.open_file("Select source files", filters=["*.csv"], options=pfd.opt.multiselect))
 		else:
-			print("No import selected")
+			log("default", "imports", "No import selected")
 
 	def save_button(self, imp : Import) -> bool:
 		pressed = False
@@ -229,7 +229,6 @@ class UI:
 					if self.file_op_ready(UI.FileOperation.SAVE_IMPORTS):
 						filepath = self.file_dialog[1].result()
 						if filepath:
-							print(filepath)
 							self.selected_import.save(filename=filepath)
 							self.changed_selected = True
 						self.file_dialog = UI.FileOperation.make_noop()
@@ -238,7 +237,6 @@ class UI:
 					self.load_button()
 					if self.file_op_ready(UI.FileOperation.LOAD_IMPORTS):
 						for filepath in self.file_dialog[1].result():
-							print(filepath)
 							self.imported.append(Import.from_file(filepath))
 						self.selected_import = self.imported[-1]
 						self.changed_selected = True
