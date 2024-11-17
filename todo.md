@@ -35,7 +35,7 @@
 	- [x] standard file format
 	- [x] file format mapping
 	- [x] Import conversion
-	- [ ] CategoryBlueprint conversion
+	- [x] CategoryBlueprint conversion
 	- [ ] report dirty state
 - [x] logging console
 - [ ] UX quality pass

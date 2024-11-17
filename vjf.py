@@ -53,7 +53,7 @@ def save(filename : str, fmt : Format | str, content : Any):
 				'content' : fmt.serialiser(content, filename)
 			}, out)
 	except Exception as e:
-		log("default", "VJF", f"failed to save {filename} : {e}", Log.Level.ERROR)
+		log("default", "VJF", f"failed to save {filename} : {e}", Log.Level.ERR)
 
 def load(filename : str, expected_fmt : Format | str | None = None) -> tuple[Any, Format, VID] | None:
 	try:
@@ -67,13 +67,13 @@ def load(filename : str, expected_fmt : Format | str | None = None) -> tuple[Any
 			if expected_fmt is not None:
 				if expected_fmt is str:
 					expected_fmt = FormatMap[expected_fmt]
-				assert fmt == expected_fmt, f"Protocol mismatch: {fmt} != {expected_fmt}"
+				assert fmt == expected_fmt, f"Protocol mismatch: {fmt.id} != {expected_fmt.id}"
 			assert fmt.version.valid_upgrade(version), f"Load upgrade impossible, incompatible version {version}, current is {fmt.version} (will only upgrade when major version match)"
 
 			content = fmt.parser(data['content'], version, path.abspath(filename))
 			return content, fmt, version
 	except Exception as e:
-		log("default", "VJF", f"failed to load {filename} : {e}", Log.Level.ERROR)
+		log("default", "VJF", f"failed to load {filename} : {e}", Log.Level.ERR)
 	return None
 
 class FileSlot:
@@ -103,7 +103,10 @@ class FileSlot:
 			self.format_id = format_override
 		assert(self.path is not None)
 		assert(self.format_id is not None)
-		content, fmt, version = load(self.path, expected_fmt=FormatMap[self.format_id])
+		res = load(self.path, expected_fmt=FormatMap[self.format_id])
+		if res is None:
+			return None
+		content, fmt, version = res
 		self.dirty = version < fmt.version
 		self.content = content
 		return content
@@ -111,5 +114,5 @@ class FileSlot:
 	@staticmethod
 	def from_file(path : str, format_id : str = None):
 		new = FileSlot(path, format_id)
-		new.load()
-		return new
+		res = new.load()
+		return new if res is not None else None

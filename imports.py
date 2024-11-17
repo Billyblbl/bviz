@@ -228,7 +228,9 @@ class UI:
 					self.load_button()
 					if self.file_op_ready(UI.FileOperation.LOAD_IMPORTS):
 						for filepath in self.file_dialog[1].result():
-							self.imported.append(FileSlot.from_file(filepath, format_id="bankviz-import"))
+							new_import = FileSlot.from_file(filepath, format_id="bankviz-import")
+							if new_import:
+								self.imported.append(new_import)
 						self.selected_import = self.imported[-1] if len(self.imported) > 0 else None
 						self.changed_selected = True
 						self.file_dialog = UI.FileOperation.make_noop()

@@ -4,6 +4,7 @@ import imports
 import analysis
 import category
 import console
+from console import LogEntry as Log
 
 app = App("bankviz")
 
@@ -36,8 +37,8 @@ while app.run_frame():
 		category_ui.menu("Categories")
 		if analysis_ui.menu("Analysis", analysis_reports, analysis_ui.can_analyse(import_ui.get_selection(), category_ui.categories)):
 			analysis_reports = analysis_ui.analyse(import_ui.get_selection(), category_ui.categories)
-			console.log("default", "main", f"Analysed : {len(analysis_reports)} reports")
-			console.log("default", "main", f"Analysis reason : manual")
+			console.log("default", "main", f"Analysed : {len(analysis_reports)} reports", Log.Level.DEBUG)
+			console.log("default", "main", f"Analysis reason : manual", Log.Level.DEBUG)
 		force_scroll_console = console_ui.menu("Console")
 
 		with imgui_ctx.begin_menu("View", True) as menu:
@@ -60,13 +61,13 @@ while app.run_frame():
 
 	if (changed_selected_import or changed_categories or changed_config) and analysis_ui.can_analyse(selected_import, selected_categories):
 		analysis_reports = analysis_ui.analyse(selected_import, selected_categories)
-		console.log("default", "main", f"Analysed : {len(analysis_reports)} reports")
+		console.log("default", "main", f"Analysed : {len(analysis_reports)} reports", Log.Level.INFO)
 		if changed_selected_import:
-			console.log("default", "main", f"Analysis reason : changed_selected_import")
+			console.log("default", "main", f"Analysis reason : changed_selected_import", Log.Level.DEBUG)
 		if changed_categories:
-			console.log("default", "main", f"Analysis reason : changed_categories")
+			console.log("default", "main", f"Analysis reason : changed_categories", Log.Level.DEBUG)
 		if changed_config:
-			console.log("default", "main", f"Analysis reason : changed_config")
+			console.log("default", "main", f"Analysis reason : changed_config", Log.Level.DEBUG)
 
 	if opened_analysis_categorical_window:
 		analysis_ui.draw_categorical("Analysis", analysis_reports, selected_categories)

@@ -1,12 +1,12 @@
 from copy import copy
 from enum import Enum
 import json
-from typing import Any
 from imports import amount
 import re
 from imgui_bundle import portable_file_dialogs as pfd #type: ignore
 from imgui_bundle import imgui, imgui_ctx
 from console import log
+from vjf import VID, Format, save, load, FormatMap
 
 class Category:
 	def __init__(self, name, predicate = lambda _: False, sub = []):
@@ -103,6 +103,12 @@ def table_push_column(id):
 	imgui.table_next_column()
 	return imgui_ctx.push_id(id)
 
+FormatMap["bankviz-category"] = Format(
+	id="bankviz-category",
+	version=VID(0, 1, 0),
+	parser=lambda data, _, __: [CategoryBlueprint.from_dict(d) for d in data],
+	serialiser=lambda cat, _: [c.to_dict() for c in cat]
+)
 
 class UI:
 	def __init__(self):
@@ -169,23 +175,16 @@ class UI:
 							if self.file_op[1].ready():
 								filepaths = self.file_op[1].result()
 								for filepath in filepaths:
-									try:
-										with open(filepath, "r") as source:
-											if source is None:
-												raise Exception("File not found")
-											for d in json.load(source):
-												self.file_op_target.append(CategoryBlueprint.from_dict(d))
-												self.selection_blueprints = self.file_op_target[-1]
-									except Exception as e:
-										log("default", "category", f"failed to load {filepath} : {e}")
+									content, fmt, version = load(filepath, expected_fmt=FormatMap["bankviz-category"])
+									self.file_op_target.extend(content)
+									self.selection_blueprints = self.file_op_target[-1]
 								self.file_op = None
 								self.file_op_target = None
 						case UI.FileOp.SAVE:
 							if self.file_op[1].ready():
 								filepath = self.file_op[1].result()
 								if (filepath):
-									with open(filepath, "w") as out:
-										json.dump([cat.to_dict() for cat in self.file_op_target], out)
+									save(filepath, FormatMap["bankviz-category"], self.file_op_target)
 								self.file_op = None
 								self.file_op_target = None
 
