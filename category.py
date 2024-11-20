@@ -181,8 +181,9 @@ class UI:
 									else:
 										content, _, _ = load(filepath, expected_fmt=FormatMap["bankviz-category"])
 										self.slot.dirty = True
-									self.file_op_target.extend(content)
-									self.selection_blueprints = self.file_op_target[-1]
+									if content:
+										self.file_op_target.extend(content)
+										self.selection_blueprints = self.file_op_target[-1]
 								self.file_op = None
 								self.file_op_target = None
 						case UI.FileOp.SAVE:
