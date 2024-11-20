@@ -31,12 +31,12 @@
 - [x] plot analysis : status tracking
 - [x] window bar menu controls
 - [x] refactor menu controls into respective modules
-- [ ] file format versionings
+- [x] file format versionings
 	- [x] standard file format
 	- [x] file format mapping
 	- [x] Import conversion
 	- [x] CategoryBlueprint conversion
-	- [ ] report dirty state
+	- [x] report dirty state
 - [x] logging console
 - [ ] UX quality pass
 	- [ ] Pinned autoimport / opening last state before closing

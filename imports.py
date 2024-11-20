@@ -61,10 +61,13 @@ class Import:
 	def section(self, timespan : Timespan):
 		return filter(lambda e: e['date'] >= timespan.begin and e['date'] <= timespan.end, self.entries())
 
-	def select_dates_from_contents(self):
+	def select_dates_from_contents(self) -> bool:
+		b, e = self.begin, self.end
+		init_dates = self.begin is None or self.end is None
 		entries = load_entries(self.files)
 		self.begin = min(datetime.strptime(e['date'], "%d/%m/%Y") for e in entries)
 		self.end = max(datetime.strptime(e['date'], "%d/%m/%Y") for e in entries)
+		return init_dates or b != self.begin or e != self.end
 
 	class Section:
 		def __init__(self, timespan : Timespan, entries = []):
@@ -245,7 +248,7 @@ class UI:
 								with imgui_ctx.push_id(idx):
 									imgui.table_next_row()
 									imgui.table_next_column()
-									just, selected = imgui.selectable(path.basename(import_data.path), self.selected_import.path == import_data.path if self.selected_import else False, imgui.SelectableFlags_.allow_double_click)
+									just, selected = imgui.selectable(path.basename(import_data.path) + (" ·" if import_data.dirty else ''), self.selected_import.path == import_data.path if self.selected_import else False, flags=imgui.SelectableFlags_.allow_double_click)
 									if selected:
 										self.selected_import = import_data
 										if just:
@@ -271,14 +274,13 @@ class UI:
 						if len(self.get_selection().files) == 0:
 							imgui.begin_disabled()
 						if imgui.button("Select dates from contents"):
-							self.get_selection().select_dates_from_contents()
+							self.selected_import.dirty |= self.get_selection().select_dates_from_contents()
 						if len(self.get_selection().files) == 0:
 							imgui.end_disabled()
 						imgui.same_line()
 						_, self.auto_select_import_dates = imgui.checkbox("Auto", self.auto_select_import_dates)
-
 						if self.auto_select_import_dates and len(self.get_selection().files) > 0:
-							self.get_selection().select_dates_from_contents()
+							self.selected_import.dirty |= self.get_selection().select_dates_from_contents()
 							imgui.begin_disabled()
 						changed, self.get_selection().begin = input_date("Begin", self.get_selection().begin)
 						changed, self.get_selection().end = input_date("End", self.get_selection().end)
@@ -302,6 +304,7 @@ class UI:
 										if imgui.button("X"):
 											self.get_selection().files.remove(file)
 											self.get_selection().load_entries()
+											self.selected_import.dirty = True
 											self.changed_selected = True
 											self.selected_source_file = None
 							if (imgui.button("+")):
@@ -309,6 +312,7 @@ class UI:
 							if self.file_op_ready(UI.FileOperation.SECLECT_SOURCES):
 								for filepath in self.file_dialog[1].result():
 									self.get_selection().files.append(filepath)
+									self.selected_import.dirty = True
 								self.get_selection().load_entries()
 								self.changed_selected = True
 								self.file_dialog = UI.FileOperation.make_noop()

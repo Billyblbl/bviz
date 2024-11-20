@@ -1,12 +1,11 @@
 from copy import copy
 from enum import Enum
-import json
 from imports import amount
 import re
 from imgui_bundle import portable_file_dialogs as pfd #type: ignore
 from imgui_bundle import imgui, imgui_ctx
 from console import log
-from vjf import VID, Format, save, load, FormatMap
+from vjf import VID, FileSlot, Format, save, load, FormatMap
 
 class Category:
 	def __init__(self, name, predicate = lambda _: False, sub = []):
@@ -112,7 +111,8 @@ FormatMap["bankviz-category"] = Format(
 
 class UI:
 	def __init__(self):
-		self.blueprints : list[CategoryBlueprint] = []
+		self.slot : FileSlot = FileSlot(path="unsaved.json", format_id="bankviz-category", content=[])
+		self.blueprints : list[CategoryBlueprint] = self.slot.content
 		self.categories : list[Category] = []
 		self.file_op = None
 		self.file_op_target = None
@@ -175,7 +175,12 @@ class UI:
 							if self.file_op[1].ready():
 								filepaths = self.file_op[1].result()
 								for filepath in filepaths:
-									content, fmt, version = load(filepath, expected_fmt=FormatMap["bankviz-category"])
+									content : list[CategoryBlueprint] = None
+									if self.file_op_target == self.slot.content:
+										content = self.slot.load(path_override=filepath, format_override="bankviz-category")
+									else:
+										content, _, _ = load(filepath, expected_fmt=FormatMap["bankviz-category"])
+										self.slot.dirty = True
 									self.file_op_target.extend(content)
 									self.selection_blueprints = self.file_op_target[-1]
 								self.file_op = None
@@ -207,6 +212,7 @@ class UI:
 											self.changed_categories
 
 					with table_push_column("##category blueprint hierarchy column"):
+						imgui.text(self.slot.path + (" ·" if self.slot.dirty else ''))
 						if imgui.button("Load"):
 							self.load_category(destination=self.blueprints)
 						imgui.same_line()
@@ -233,6 +239,7 @@ class UI:
 
 											if imgui.button("+"):
 												blueprint.sub.append(CategoryBlueprint())
+												self.slot.dirty = True
 												self.selection_blueprints = blueprint.sub[-1]
 											imgui.same_line()
 											if imgui.button("Load"):
@@ -241,11 +248,9 @@ class UI:
 											if imgui.button("Use"):
 												changed_rec = self.use_category(blueprint)
 											imgui.same_line()
-											if imgui.button("Save"):
-												self.save_category([blueprint])
-											imgui.same_line()
 											if imgui.button("X"):
 												blueprints.remove(blueprint)
+												self.slot.dirty = True
 												if self.selection_blueprints == blueprint:
 													self.selection_blueprints = None
 											imgui.indent()
@@ -256,6 +261,7 @@ class UI:
 								imgui.table_next_row()
 								imgui.table_next_column()
 								if imgui.button("+"):
+									self.slot.dirty = True
 									self.blueprints.append(CategoryBlueprint())
 									self.selection_blueprints = self.blueprints[-1]
 								imgui.same_line()
@@ -264,7 +270,9 @@ class UI:
 
 					with table_push_column("##category blueprint details column"):
 						if self.selection_blueprints:
-							_, self.selection_blueprints.name = imgui.input_text("Name", self.selection_blueprints.name)
+							changed_name, self.selection_blueprints.name = imgui.input_text("Name", self.selection_blueprints.name)
+							if changed_name:
+								self.slot.dirty = True
 							changed_filter, idx = imgui.combo("Filter", self.selection_blueprints.filter.value, [f.name for f in list(CategoryBlueprint.Filter)])
 							self.selection_blueprints.filter = CategoryBlueprint.Filter(idx)
 							imgui.text("Filter Config")
@@ -272,24 +280,32 @@ class UI:
 								case CategoryBlueprint.Filter.Regex:
 									if changed_filter:
 										self.selection_blueprints.config = ("", "")
-									_, reg = imgui.input_text("Regex", self.selection_blueprints.config[0])
-									_, col = imgui.input_text("Column", self.selection_blueprints.config[1])
+									changed_regex, reg = imgui.input_text("Regex", self.selection_blueprints.config[0])
+									changed_column, col = imgui.input_text("Column", self.selection_blueprints.config[1])
 									self.selection_blueprints.config = (reg, col)
+									if changed_regex or changed_column:
+										self.slot.dirty = True
 								case CategoryBlueprint.Filter.Comparison:
 									if changed_filter:
 										self.selection_blueprints.config = ("==", 0)
 									comparators = ["==", "!=", ">", "<", ">=", "<="]
-									_, comp_idx = imgui.combo("Comparison", comparators.index(self.selection_blueprints.config[0]), comparators)
-									_, comp_operand = imgui.input_float("Operand", self.selection_blueprints.config[1])
+									changed_comp, comp_idx = imgui.combo("Comparison", comparators.index(self.selection_blueprints.config[0]), comparators)
+									changed_op, comp_operand = imgui.input_float("Operand", self.selection_blueprints.config[1])
+									if changed_comp or changed_op:
+										self.slot.dirty = True
 									self.selection_blueprints.config = (comparators[comp_idx], comp_operand)
 								case CategoryBlueprint.Filter.MovementTarget:
 									if changed_filter:
 										self.selection_blueprints.config = ""
-									_, self.selection_blueprints.config = imgui.input_text("Regex", self.selection_blueprints.config)
+									changed_regex, self.selection_blueprints.config = imgui.input_text("Regex", self.selection_blueprints.config)
+									if changed_regex:
+										self.slot.dirty = True
 								case CategoryBlueprint.Filter.Custom:
 									if changed_filter:
 										self.selection_blueprints.config = "False"
-									_, self.selection_blueprints.config = imgui.input_text("Predicate", self.selection_blueprints.config)
+									changed_pred, self.selection_blueprints.config = imgui.input_text("Predicate", self.selection_blueprints.config)
+									if changed_pred:
+										self.slot.dirty = True
 						else:
 							imgui.begin_disabled()
 							imgui.input_text("Name", "------------")
