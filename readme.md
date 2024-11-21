@@ -29,4 +29,4 @@ For priority features refer to [the todo list](todo.md)
 
 ## License
 
-BlblBankViz is licensed under the MIT License. See LICENSE.txt for details.
+BlblBankViz is licensed under the MIT License. See [LICENSE.txt] for details.
