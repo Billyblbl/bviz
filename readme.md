@@ -1,6 +1,6 @@
-# BankViz Project
+# BlblBankViz Project
 
-BankViz is a personal finance analysis tool designed to help users visualize and understand their banking data. The project aims to provide a user-friendly interface for importing, categorizing, and analyzing bank statements.
+BlblBankViz is a personal finance analysis tool designed to help users visualize and understand their banking data. The project aims to provide a user-friendly interface for importing, categorizing, and analyzing bank statements.
 
 ## About
 
@@ -26,3 +26,7 @@ This project was originally a simple python script using matplotlib that i clobb
 
 Contributions are welcome! If you'd like to report a bug or suggest a feature, please open an issue on the GitHub repository. For code contributions, please submit a pull request with a clear description of the changes. Do keep in mind however that due to the side-project nature of it I may not have the time to properly maintain this software. This includes managing contributions.
 For priority features refer to [the todo list](todo.md)
+
+## License
+
+BlblBankViz is licensed under the MIT License. See LICENSE.txt for details.
