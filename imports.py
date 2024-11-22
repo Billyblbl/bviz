@@ -134,6 +134,21 @@ class UI:
 		self.file_dialog = (UI.FileOperation.SAVE_IMPORTS, pfd.save_file("Save as", imp.path, filters=["*.json"]))
 		self.file_op_target = imp
 
+	def add_imports(self, imp : list[FileSlot]) -> None:
+		self.imported.extend(imp)
+		self.selected_import = self.imported[-1]
+		self.changed_selected = True
+
+	def create_import(self, path : str = "unsaved.json") -> FileSlot:
+		self.imported.append(FileSlot(path=path, format_id="bankviz-import", content=Import()))
+		self.selected_import = self.imported[-1]
+		self.changed_selected = True
+		return self.selected_import
+
+	def add_sources(self, sources : list[str]) -> None:
+		self.selected_import.content.files.extend(sources)
+		self.changed_selected = True
+
 	def try_select_sources(self) -> bool:
 		if self.selected_import:
 			self.file_dialog = (UI.FileOperation.SECLECT_SOURCES, pfd.open_file("Select source files", filters=["*.csv"], options=pfd.opt.multiselect))

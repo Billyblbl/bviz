@@ -5,6 +5,8 @@ import analysis
 import category
 import console
 from console import LogEntry as Log
+from os import path
+from vjf import load, FormatMap, FileSlot
 
 app = App("bankviz")
 
@@ -26,6 +28,29 @@ opened_console_window : bool = True
 console.log("default", "main", "Initialized UIs")
 
 while app.run_frame():
+
+	force_focus = None
+	for pending_cat, pending_imp, pending_src in app.pending_file_drops:
+		# load pending categories
+		for slot in pending_cat:
+			category_ui.add_blueprints(slot.content)
+			force_focus = category_ui
+			opened_category_window = True
+		if len(pending_cat) == 1 and len(category_ui.blueprints) == 0:
+			category_ui.slot = pending_cat[0]
+		# load pending imports
+		if len(pending_imp) > 0:
+			import_ui.add_imports(pending_imp)
+			force_focus = import_ui
+			opened_import_window = True
+		# load pending sources
+		if len(pending_src) > 0:
+			force_focus = import_ui
+			opened_import_window = True
+			if import_ui.selected_import is None:
+				import_ui.create_import()
+			import_ui.add_sources(pending_src)
+	app.pending_file_drops.clear()
 
 	with imgui_ctx.begin_main_menu_bar():
 		with imgui_ctx.begin_menu("App", True) as menu:
@@ -53,8 +78,12 @@ while app.run_frame():
 	imgui.dock_space_over_viewport()
 
 	if opened_import_window:
+		if force_focus == import_ui:
+			imgui.set_next_window_focus()
 		changed_selected_import, selected_import = import_ui.draw("Imports")
 	if opened_category_window:
+		if force_focus == category_ui:
+			imgui.set_next_window_focus()
 		changed_categories, selected_categories = category_ui.draw("Categories")
 	if opened_analysis_config_window:
 		changed_config = analysis_ui.draw_config("Config", categories=selected_categories)

@@ -102,11 +102,12 @@ class FileSlot:
 		if format_override:
 			self.format_id = format_override
 		assert(self.path is not None)
-		assert(self.format_id is not None)
-		res = load(self.path, expected_fmt=FormatMap[self.format_id])
+		res = load(self.path, expected_fmt=FormatMap[self.format_id] if self.format_id else None)
 		if res is None:
 			return None
 		content, fmt, version = res
+		if self.format_id is None:
+			self.format_id = fmt.id
 		self.dirty = version < fmt.version
 		self.content = content
 		return content

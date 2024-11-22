@@ -123,6 +123,11 @@ class UI:
 		LOAD = 0
 		SAVE = 1
 
+	def add_blueprints(self, categories : list[CategoryBlueprint]):
+		self.blueprints.extend(categories)
+		self.slot.dirty = True
+		self.selection_blueprints = self.blueprints[-1]
+
 	def load_category(self, destination = None) -> CategoryBlueprint:
 		self.file_op = (UI.FileOp.LOAD, pfd.open_file("Select category file", filters=["*.json"]))
 		self.file_op_target = destination

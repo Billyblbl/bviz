@@ -2,6 +2,10 @@ from imgui_bundle import imgui
 from imgui_bundle.python_backends.glfw_backend import GlfwRenderer
 import glfw
 import OpenGL.GL as gl
+from vjf import  FileSlot
+from os import path
+import console
+from console import LogEntry as Log
 
 class App:
 	def __init__(self, name : str = "window", dimensions : tuple[int, int] = (800, 600)):
@@ -21,6 +25,8 @@ class App:
 			glfw.terminate()
 			raise RuntimeError("Could not initialize Window")
 		self.renderer = GlfwRenderer(self.window)
+		self.pending_file_drops = []
+		glfw.set_drop_callback(self.window, lambda _, paths: self.pending_file_drops.append(self.sort_pending_file_drops(paths)))
 		# Note:
 		# The way font are loaded in this example is a bit tricky.
 		# We are not using imgui.backends.opengl3_XXX anywhere else, because the rendering is done via Python.
@@ -59,6 +65,24 @@ class App:
 
 	def close_next_update(self):
 		glfw.set_window_should_close(self.window, True)
+
+	def sort_pending_file_drops(self, drops : list[str]) -> tuple[list[FileSlot], list[FileSlot], list[str]]:
+		pending_imports : list[FileSlot] = []
+		pending_category : list[FileSlot] = []
+		pending_sources : list[str] = []
+		for file in drops:
+			match path.splitext(file)[1]:
+				case ".json":
+					slot = FileSlot.from_file(file)
+					if slot.format_id == "bankviz-category":
+						pending_category.append(slot)
+					elif slot.format_id == "bankviz-import":
+						pending_imports.append(slot)
+				case ".csv":
+					pending_sources.append(file)
+				case _:
+					console.log("default", "app", f"Unhandled file type {file}", Log.Level.WARN)
+		return pending_category, pending_imports, pending_sources
 
 	def shutdown(self):
 		self.renderer.shutdown()
