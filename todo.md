@@ -38,9 +38,10 @@
 	- [x] CategoryBlueprint conversion
 	- [x] report dirty state
 - [x] logging console
+- [ ] Fix analysis color collisions
 - [ ] UX quality pass
 	- [ ] Pinned autoimport / opening last state before closing
-	- [ ] drag n drop loading
+	- [x] drag n drop loading
 	- [ ] multi selects
 	- [ ] renaming
 	- [ ] keybinds
