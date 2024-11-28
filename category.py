@@ -232,8 +232,22 @@ class UI:
 							self.blueprints = []
 						with imgui_ctx.begin_list_box("##hierachy", imgui.get_content_region_avail()):
 							with imgui_ctx.begin_table("##hierarchy content", 2, flags=imgui.TableFlags_.resizable | imgui.TableFlags_.borders_inner):
-								def recursive_blueprints_edit(blueprints : list[CategoryBlueprint]) -> bool:
+								def recursive_blueprints_edit(blueprints : list[CategoryBlueprint], parent : CategoryBlueprint | None = None, applied_key_selection : bool = False) -> bool:
 									changed_rec = False
+									index_selected = blueprints.index(self.selection_blueprints) if self.selection_blueprints and self.selection_blueprints in blueprints else -1
+									if not applied_key_selection and imgui.is_window_focused() and index_selected >= 0:
+										if imgui.is_key_pressed(imgui.Key.up_arrow) > 0:
+											self.selection_blueprints = blueprints[max(0, index_selected - 1)]
+											applied_key_selection = True
+										if imgui.is_key_pressed(imgui.Key.down_arrow) > 0:
+											self.selection_blueprints = blueprints[min(len(blueprints) - 1, index_selected + 1)]
+											applied_key_selection = True
+										if imgui.is_key_pressed(imgui.Key.left_arrow) > 0 and parent:
+											self.selection_blueprints = parent
+											applied_key_selection = True
+										if imgui.is_key_pressed(imgui.Key.right_arrow) > 0 and len(self.selection_blueprints.sub) > 0:
+											applied_key_selection = True
+											self.selection_blueprints = self.selection_blueprints.sub[0]
 									for blueprint, index in zip(blueprints, range(len(blueprints))):
 										with imgui_ctx.push_id(index):
 											imgui.table_next_row()
@@ -242,7 +256,6 @@ class UI:
 											if selected:
 												self.selection_blueprints = blueprint
 											imgui.table_next_column()
-
 											if imgui.button("+"):
 												blueprint.sub.append(CategoryBlueprint())
 												self.slot.dirty = True
@@ -260,7 +273,7 @@ class UI:
 												if self.selection_blueprints == blueprint:
 													self.selection_blueprints = None
 											imgui.indent()
-											changed_rec |= recursive_blueprints_edit(blueprint.sub)
+											changed_rec |= recursive_blueprints_edit(blueprint.sub, blueprint, applied_key_selection)
 											imgui.unindent()
 									return changed_rec
 								self.changed_categories |= recursive_blueprints_edit(self.blueprints)
