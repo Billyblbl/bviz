@@ -2,6 +2,7 @@ import csv
 from datetime import datetime
 from enum import Enum
 from os import path
+from app import list_navigate
 from schedule import Timespan, Granularity, input_date
 from imgui_bundle import portable_file_dialogs as pfd #type: ignore
 from imgui_bundle import imgui, imgui_ctx
@@ -183,16 +184,19 @@ class UI:
 			self.load_imports()
 		return pressed
 
+	def remove_import(self, imp : FileSlot) -> bool:
+		if self.selected_import == imp:
+			self.selected_import = None
+			self.changed_selected = True
+		self.imported.remove(imp)
+
 	def remove_button(self, imp : FileSlot) -> bool:
 		pressed = False
 		if not imp:
 			imgui.begin_disabled()
 		if imgui.button("X"):
 			pressed = True
-			if self.selected_import == imp:
-				self.selected_import = None
-				self.changed_selected = True
-			self.imported.remove(imp)
+			self.remove_import(imp)
 		if not imp:
 			imgui.end_disabled()
 		return pressed
@@ -226,6 +230,9 @@ class UI:
 	def draw(self, title : str = "Imports") -> tuple[bool, Import]:
 		with imgui_ctx.begin(title) as window:
 			if window:
+				if imgui.is_window_focused() and self.selected_import and imgui.is_key_chord_pressed(imgui.Key.ctrl | imgui.Key.s) and self.selected_import.dirty:
+					self.save_import(self.selected_import)
+
 				with imgui_ctx.begin_table("##imports table", 3, flags=imgui.TableFlags_.resizable):
 					#region imports list column
 					imgui.table_next_column()
@@ -259,11 +266,27 @@ class UI:
 
 					with imgui_ctx.begin_list_box("##imports", imgui.get_content_region_avail()):
 						with imgui_ctx.begin_table('##import entry', 2, flags=imgui.TableFlags_.resizable):
+
+							if imgui.is_window_focused() and imgui.is_key_chord_pressed(imgui.Key.ctrl | imgui.Key.l):
+								self.load_imports()
+							if imgui.is_window_focused() and imgui.is_key_chord_pressed(imgui.Key.ctrl | imgui.Key.n):
+								self.create_import()
+							if imgui.is_window_focused() and self.selected_import and imgui.is_key_pressed(imgui.Key.delete):
+								self.remove_import(self.selected_import)
+							if imgui.is_window_focused() and imgui.is_key_pressed(imgui.Key.escape):
+								self.selected_import = None
+
+							index_selected = self.imported.index(self.selected_import) if self.selected_import else -1
+							index_selected, changed = list_navigate(index_selected, len(self.imported))
+							if changed:
+								self.selected_import = self.imported[index_selected]
+								self.changed_selected = True
+
 							for import_data, idx in zip(self.imported, range(len(self.imported))):
 								with imgui_ctx.push_id(idx):
 									imgui.table_next_row()
 									imgui.table_next_column()
-									just, selected = imgui.selectable(path.basename(import_data.path) + (" ·" if import_data.dirty else ''), self.selected_import.path == import_data.path if self.selected_import else False, flags=imgui.SelectableFlags_.allow_double_click)
+									just, selected = imgui.selectable(path.basename(import_data.path) + (" ·" if import_data.dirty else ''), self.selected_import == import_data if self.selected_import else False, flags=imgui.SelectableFlags_.allow_double_click)
 									if selected:
 										self.selected_import = import_data
 										if just:
@@ -275,9 +298,7 @@ class UI:
 									imgui.same_line()
 									self.remove_button(import_data)
 						if imgui.button("+"):
-							self.imported.append(FileSlot(path="unsaved.json", format_id="bankviz-import", content=Import()))
-							self.selected_import = self.imported[-1]
-							self.changed_selected = True
+							self.create_import()
 						imgui.same_line()
 						if imgui.button("Load"):
 							self.file_dialog = (UI.FileOperation.LOAD_IMPORTS, pfd.open_file("Select report file", filters=["*.json"], options=pfd.opt.multiselect))
@@ -308,6 +329,17 @@ class UI:
 					with imgui_ctx.begin_list_box("##imports files box", imgui.get_content_region_avail()):
 						if self.selected_import:
 							with imgui_ctx.begin_table("##import files entry table", 2, flags=imgui.TableFlags_.resizable):
+								if imgui.is_window_focused() and self.selected_source_file and imgui.is_key_pressed(imgui.Key.delete):
+									self.remove_source(self.selected_source_file)
+								if imgui.is_window_focused() and (imgui.is_key_chord_pressed(imgui.Key.ctrl | imgui.Key.l) or imgui.is_key_chord_pressed(imgui.Key.ctrl | imgui.Key.n)):
+									self.try_select_sources()
+								if imgui.is_window_focused() and imgui.is_key_pressed(imgui.Key.escape):
+									self.selected_source_file = None
+
+								index_selected = self.get_selection().files.index(self.selected_source_file) if self.selected_source_file else -1
+								index_selected, changed = list_navigate(index_selected, len(self.get_selection().files))
+								if changed:
+									self.selected_source_file = self.get_selection().files[index_selected]
 								for file in self.get_selection().files:
 									with imgui_ctx.push_id(file):
 										imgui.table_next_row()
@@ -317,11 +349,7 @@ class UI:
 											self.selected_source_file = file
 										imgui.table_next_column()
 										if imgui.button("X"):
-											self.get_selection().files.remove(file)
-											self.get_selection().load_entries()
-											self.selected_import.dirty = True
-											self.changed_selected = True
-											self.selected_source_file = None
+											self.remove_source(file)
 							if (imgui.button("+")):
 								self.try_select_sources()
 							if self.file_op_ready(UI.FileOperation.SECLECT_SOURCES):
@@ -349,5 +377,13 @@ class UI:
 										imgui.text(entry[c])
 					#endregion import contents column
 		return self.changed_selected, self.get_selection()
+
+	def remove_source(self, file : str):
+		self.get_selection().files.remove(file)
+		self.get_selection().load_entries()
+		self.selected_import.dirty = True
+		self.changed_selected = True
+		if file == self.selected_source_file:
+			self.selected_source_file = None
 
 # endregion ui

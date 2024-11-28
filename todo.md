@@ -44,12 +44,15 @@
 	- [x] drag n drop loading
 	- [ ] multi selects
 	- [ ] renaming
+	- [ ] reordering
 	- [ ] keybinds
-		- [ ] delete
+		- [x] delete
 		- [ ] ctrl+x/c/v
-		- [ ] arrows
-		- [ ] save
-		- [ ] open file
+		- [x] arrows
+		- [x] save
+		- [x] open file
+		- [x] unselect
+		- [x] new
 		- [ ] window navigation
 		- [ ] rename
 - [ ] dashboard

@@ -1,5 +1,6 @@
 from copy import copy
 from enum import Enum
+from app import list_navigate
 from imports import amount
 import re
 from imgui_bundle import portable_file_dialogs as pfd #type: ignore
@@ -123,10 +124,21 @@ class UI:
 		LOAD = 0
 		SAVE = 1
 
-	def add_blueprints(self, categories : list[CategoryBlueprint]):
-		self.blueprints.extend(categories)
+	# def add_blueprints(self, categories : list[CategoryBlueprint]):
+	# 	self.blueprints.extend(categories)
+	# 	self.slot.dirty = True
+	# 	self.selection_blueprints = self.blueprints[-1]
+
+	def add_sub_blueprints(self, destination : list[CategoryBlueprint], categories : list[CategoryBlueprint]):
+		destination.extend(categories)
 		self.slot.dirty = True
-		self.selection_blueprints = self.blueprints[-1]
+		self.selection_blueprints = destination[-1]
+
+	def remove_blueprint(self, location : list[CategoryBlueprint], blueprint : CategoryBlueprint):
+		location.remove(blueprint)
+		self.slot.dirty = True
+		if self.selection_blueprints == blueprint:
+			self.selection_blueprints = None
 
 	def load_category(self, destination = None) -> CategoryBlueprint:
 		self.file_op = (UI.FileOp.LOAD, pfd.open_file("Select category file", filters=["*.json"]))
@@ -200,7 +212,6 @@ class UI:
 								self.file_op_target = None
 
 				with imgui_ctx.begin_table("##category_sets", 3, flags=imgui.TableFlags_.resizable):
-
 					with table_push_column("##Used categories column"):
 						if imgui.button("Reset"):
 							self.categories = []
@@ -215,7 +226,7 @@ class UI:
 										imgui.table_next_column()
 										if imgui.button("X"):
 											self.categories.remove(category)
-											self.changed_categories
+											self.changed_categories = True
 
 					with table_push_column("##category blueprint hierarchy column"):
 						imgui.text(self.slot.path + (" ·" if self.slot.dirty else ''))
@@ -231,21 +242,39 @@ class UI:
 						if imgui.button("Reset"):
 							self.blueprints = []
 						with imgui_ctx.begin_list_box("##hierachy", imgui.get_content_region_avail()):
+
+							if imgui.is_window_focused() and imgui.is_key_chord_pressed(imgui.Key.ctrl | imgui.Key.s) and self.selected_import.dirty:
+								self.save_category(self.blueprints)
+							if imgui.is_window_focused() and imgui.is_key_chord_pressed(imgui.Key.ctrl | imgui.Key.l):
+								self.load_category(self.selection_blueprints.sub if self.selection_blueprints else self.blueprints)
+							if imgui.is_window_focused() and imgui.is_key_chord_pressed(imgui.Key.ctrl | imgui.Key.n):
+								self.add_sub_blueprints(self.selection_blueprints.sub if self.selection_blueprints else self.blueprints, [CategoryBlueprint()])
+							if imgui.is_window_focused() and imgui.is_key_pressed(imgui.Key.escape):
+								self.selection_blueprints = None
+							if imgui.is_window_focused() and imgui.is_key_pressed(imgui.Key.delete) and self.selection_blueprints != None:
+								def find_parent_rec(root : list[CategoryBlueprint], blueprint : CategoryBlueprint) -> CategoryBlueprint:#* this is stupid cause its a full tree walk, inefficient as hell, but at least it works
+									if blueprint in root:
+										return root
+									for bp in root:
+										result = find_parent_rec(bp.sub, blueprint)
+										if result:
+											return result
+									return None
+								self.remove_blueprint(find_parent_rec(self.blueprints, self.selection_blueprints), self.selection_blueprints)
+
 							with imgui_ctx.begin_table("##hierarchy content", 2, flags=imgui.TableFlags_.resizable | imgui.TableFlags_.borders_inner):
 								def recursive_blueprints_edit(blueprints : list[CategoryBlueprint], parent : CategoryBlueprint | None = None, applied_key_selection : bool = False) -> bool:
 									changed_rec = False
 									index_selected = blueprints.index(self.selection_blueprints) if self.selection_blueprints and self.selection_blueprints in blueprints else -1
 									if not applied_key_selection and imgui.is_window_focused() and index_selected >= 0:
-										if imgui.is_key_pressed(imgui.Key.up_arrow) > 0:
-											self.selection_blueprints = blueprints[max(0, index_selected - 1)]
+										index_selected, changed = list_navigate(index_selected, len(blueprints))
+										if changed:
+											self.selection_blueprints = blueprints[index_selected]
 											applied_key_selection = True
-										if imgui.is_key_pressed(imgui.Key.down_arrow) > 0:
-											self.selection_blueprints = blueprints[min(len(blueprints) - 1, index_selected + 1)]
-											applied_key_selection = True
-										if imgui.is_key_pressed(imgui.Key.left_arrow) > 0 and parent:
+										if imgui.is_key_pressed(imgui.Key.left_arrow) and parent:
 											self.selection_blueprints = parent
 											applied_key_selection = True
-										if imgui.is_key_pressed(imgui.Key.right_arrow) > 0 and len(self.selection_blueprints.sub) > 0:
+										if imgui.is_key_pressed(imgui.Key.right_arrow) and len(self.selection_blueprints.sub) > 0:
 											applied_key_selection = True
 											self.selection_blueprints = self.selection_blueprints.sub[0]
 									for blueprint, index in zip(blueprints, range(len(blueprints))):
@@ -257,9 +286,7 @@ class UI:
 												self.selection_blueprints = blueprint
 											imgui.table_next_column()
 											if imgui.button("+"):
-												blueprint.sub.append(CategoryBlueprint())
-												self.slot.dirty = True
-												self.selection_blueprints = blueprint.sub[-1]
+												self.add_sub_blueprints(blueprint.sub, [CategoryBlueprint()])
 											imgui.same_line()
 											if imgui.button("Load"):
 												self.load_category(blueprint.sub)
