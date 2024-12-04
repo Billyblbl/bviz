@@ -68,7 +68,8 @@ class Import:
 		entries = load_entries(self.files)
 		self.begin = min(datetime.strptime(e['date'], "%d/%m/%Y") for e in entries)
 		self.end = max(datetime.strptime(e['date'], "%d/%m/%Y") for e in entries)
-		return init_dates or b != self.begin or e != self.end
+		changed_dates = init_dates or b != self.begin or e != self.end
+		return changed_dates
 
 	class Section:
 		def __init__(self, timespan : Timespan, entries = []):
@@ -207,6 +208,12 @@ class UI:
 	def get_selection(self) -> Import | None:
 		return self.selected_import.content if self.selected_import else None
 
+	def select_import_dates(self) -> bool:
+		diff = self.get_selection().select_dates_from_contents()
+		self.selected_import.dirty |= diff
+		self.changed_selected |= diff
+		return diff
+
 	def menu(self, title : str):
 		self.changed_selected = False
 		with imgui_ctx.begin_menu(title, True) as menu:
@@ -230,7 +237,7 @@ class UI:
 	def draw(self, title : str = "Imports") -> tuple[bool, Import]:
 		with imgui_ctx.begin(title) as window:
 			if window:
-				if imgui.is_window_focused() and self.selected_import and imgui.is_key_chord_pressed(imgui.Key.ctrl | imgui.Key.s) and self.selected_import.dirty:
+				if imgui.is_window_focused() and self.selected_import and imgui.is_key_chord_pressed(imgui.Key.left_ctrl | imgui.Key.s) and self.selected_import.dirty:
 					self.save_import(self.selected_import)
 
 				with imgui_ctx.begin_table("##imports table", 3, flags=imgui.TableFlags_.resizable):
@@ -267,9 +274,9 @@ class UI:
 					with imgui_ctx.begin_list_box("##imports", imgui.get_content_region_avail()):
 						with imgui_ctx.begin_table('##import entry', 2, flags=imgui.TableFlags_.resizable):
 
-							if imgui.is_window_focused() and imgui.is_key_chord_pressed(imgui.Key.ctrl | imgui.Key.l):
+							if imgui.is_window_focused() and imgui.is_key_chord_pressed(imgui.Key.left_ctrl | imgui.Key.l):
 								self.load_imports()
-							if imgui.is_window_focused() and imgui.is_key_chord_pressed(imgui.Key.ctrl | imgui.Key.n):
+							if imgui.is_window_focused() and imgui.is_key_chord_pressed(imgui.Key.left_ctrl | imgui.Key.n):
 								self.create_import()
 							if imgui.is_window_focused() and self.selected_import and imgui.is_key_pressed(imgui.Key.delete):
 								self.remove_import(self.selected_import)
@@ -310,13 +317,13 @@ class UI:
 						if len(self.get_selection().files) == 0:
 							imgui.begin_disabled()
 						if imgui.button("Select dates from contents"):
-							self.selected_import.dirty |= self.get_selection().select_dates_from_contents()
+							self.select_import_dates()
 						if len(self.get_selection().files) == 0:
 							imgui.end_disabled()
 						imgui.same_line()
 						_, self.auto_select_import_dates = imgui.checkbox("Auto", self.auto_select_import_dates)
 						if self.auto_select_import_dates and len(self.get_selection().files) > 0:
-							self.selected_import.dirty |= self.get_selection().select_dates_from_contents()
+							self.select_import_dates()
 							imgui.begin_disabled()
 						changed, self.get_selection().begin = input_date("Begin", self.get_selection().begin)
 						changed, self.get_selection().end = input_date("End", self.get_selection().end)
@@ -331,7 +338,7 @@ class UI:
 							with imgui_ctx.begin_table("##import files entry table", 2, flags=imgui.TableFlags_.resizable):
 								if imgui.is_window_focused() and self.selected_source_file and imgui.is_key_pressed(imgui.Key.delete):
 									self.remove_source(self.selected_source_file)
-								if imgui.is_window_focused() and (imgui.is_key_chord_pressed(imgui.Key.ctrl | imgui.Key.l) or imgui.is_key_chord_pressed(imgui.Key.ctrl | imgui.Key.n)):
+								if imgui.is_window_focused() and (imgui.is_key_chord_pressed(imgui.Key.left_ctrl | imgui.Key.l) or imgui.is_key_chord_pressed(imgui.Key.left_ctrl | imgui.Key.n)):
 									self.try_select_sources()
 								if imgui.is_window_focused() and imgui.is_key_pressed(imgui.Key.escape):
 									self.selected_source_file = None

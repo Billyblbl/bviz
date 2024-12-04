@@ -243,11 +243,11 @@ class UI:
 							self.blueprints = []
 						with imgui_ctx.begin_list_box("##hierachy", imgui.get_content_region_avail()):
 
-							if imgui.is_window_focused() and imgui.is_key_chord_pressed(imgui.Key.ctrl | imgui.Key.s) and self.selected_import.dirty:
+							if imgui.is_window_focused() and imgui.is_key_chord_pressed(imgui.Key.left_ctrl | imgui.Key.s) and self.selected_import.dirty:
 								self.save_category(self.blueprints)
-							if imgui.is_window_focused() and imgui.is_key_chord_pressed(imgui.Key.ctrl | imgui.Key.l):
+							if imgui.is_window_focused() and imgui.is_key_chord_pressed(imgui.Key.left_ctrl | imgui.Key.l):
 								self.load_category(self.selection_blueprints.sub if self.selection_blueprints else self.blueprints)
-							if imgui.is_window_focused() and imgui.is_key_chord_pressed(imgui.Key.ctrl | imgui.Key.n):
+							if imgui.is_window_focused() and imgui.is_key_chord_pressed(imgui.Key.left_ctrl | imgui.Key.n):
 								self.add_sub_blueprints(self.selection_blueprints.sub if self.selection_blueprints else self.blueprints, [CategoryBlueprint()])
 							if imgui.is_window_focused() and imgui.is_key_pressed(imgui.Key.escape):
 								self.selection_blueprints = None

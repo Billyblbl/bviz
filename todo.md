@@ -60,7 +60,7 @@
 	- [ ] check other banks
 	- [ ] confirm current format
 - [ ] project visibility
-	- [ ] readme
+	- [x] readme
 	- [ ] user tests
 	- [ ] executable
 	- [ ] upload

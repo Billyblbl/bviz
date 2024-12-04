@@ -28,6 +28,9 @@ opened_console_window : bool = True
 console.log("default", "main", "Initialized UIs")
 
 while app.run_frame():
+	changed_selected_import : bool = False
+	changed_categories : bool = False
+	changed_config : bool = False
 
 	force_focus = None
 	for pending_cat, pending_imp, pending_src in app.pending_file_drops:

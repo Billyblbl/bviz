@@ -88,3 +88,11 @@ class App:
 		self.renderer.shutdown()
 		glfw.destroy_window(self.window)
 		glfw.terminate()
+
+def list_navigate(selected : int, upper : int = sys.maxsize) -> tuple[int, bool]:
+	if imgui.is_window_focused() and selected >= 0:
+		if imgui.is_key_pressed(imgui.Key.up_arrow) > 0:
+			return max(0, selected - 1), True
+		elif imgui.is_key_pressed(imgui.Key.down_arrow) > 0:
+			return min(upper - 1, selected + 1), True
+	return selected, False
