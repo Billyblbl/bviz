@@ -65,7 +65,7 @@ class Import:
 	def select_dates_from_contents(self) -> bool:
 		b, e = self.begin, self.end
 		init_dates = self.begin is None or self.end is None
-		entries = load_entries(self.files)
+		entries = load_entries(files=self.files)
 		self.begin = min(datetime.strptime(e['date'], "%d/%m/%Y") for e in entries)
 		self.end = max(datetime.strptime(e['date'], "%d/%m/%Y") for e in entries)
 		changed_dates = init_dates or b != self.begin or e != self.end
@@ -126,7 +126,7 @@ class UI:
 		self.imported : list[FileSlot] = []
 		self.selected_import : FileSlot = None
 		self.selected_source_file : str = None
-		self.auto_select_import_dates : bool = False
+		self.auto_select_import_dates : bool = True
 		self.changed_selected : bool = False
 
 	def load_imports(self) -> bool:
@@ -210,6 +210,8 @@ class UI:
 
 	def select_import_dates(self) -> bool:
 		diff = self.get_selection().select_dates_from_contents()
+		if diff:
+			self.get_selection().load_entries()
 		self.selected_import.dirty |= diff
 		self.changed_selected |= diff
 		return diff
@@ -322,15 +324,14 @@ class UI:
 							imgui.end_disabled()
 						imgui.same_line()
 						_, self.auto_select_import_dates = imgui.checkbox("Auto", self.auto_select_import_dates)
-						if self.auto_select_import_dates and len(self.get_selection().files) > 0:
-							self.select_import_dates()
+						if self.auto_select_import_dates:
 							imgui.begin_disabled()
 						changed, self.get_selection().begin = input_date("Begin", self.get_selection().begin)
 						changed, self.get_selection().end = input_date("End", self.get_selection().end)
 						if changed and self.get_selection().valid():
 							self.get_selection().load_entries()
 							self.changed_selected = True
-						if self.auto_select_import_dates and len(self.get_selection().files) > 0:
+						if self.auto_select_import_dates:
 							imgui.end_disabled()
 
 					with imgui_ctx.begin_list_box("##imports files box", imgui.get_content_region_avail()):
@@ -383,6 +384,8 @@ class UI:
 										imgui.table_next_column()
 										imgui.text(entry[c])
 					#endregion import contents column
+		if self.auto_select_import_dates and self.changed_selected:
+			self.select_import_dates()
 		return self.changed_selected, self.get_selection()
 
 	def remove_source(self, file : str):
